@@ -1,0 +1,136 @@
+Table 6 Detection performance of lightweight models on FPID dataset. | Scientific Reports
+Skip to main content
+Thank you for visiting nature.com. You are using a browser version with limited support for CSS. To obtain
+the best experience, we recommend you use a more up to date browser (or turn off compatibility mode in
+Internet Explorer). In the meantime, to ensure continued support, we are displaying the site without styles
+and JavaScript.
+Advertisement
+View all journals
+Saved research
+Search
+Account
+Log in
+Content
+Explore content
+About the journal
+Publish with us
+Sign up for alerts
+RSS feed
+nature
+scientific reports
+articles
+article
+table
+Table 6 Detection performance of lightweight models on FPID dataset. From: LFD-YOLO: a lightweight fall detection network with enhanced feature extraction and fusion Model | mAP0.5 (%) | mAP0.5:0.95 (%) | Parameters (M) | GFLOPS |
+Faster R-CNN | 76.1 | 37.5 | 41.3 | 189 |
+SSD | 78.6 | 39.7 | 24.1 | 30.5 |
+RT-DETR | 80.4 | 42.2 | 32.0 | 110.2 |
+YOLOv5s | 83.0 | 46.1 | 7.0 | 16.0 |
+YOLOX-s | 83.6 | 47.8 | 8.9 | 26.6 |
+YOLOv7-tiny | 81.9 | 45.6 | 6.0 | 13.2 |
+YOLOv8s | 84.2 | 48.5 | 11.1 | 28.7 |
+LFD-YOLO | 84.7 | 48.8 | 5.7 | 12.6 |
+Back to article page
+Explore content
+Research articles
+News & Comment
+Collections
+Subjects
+Follow us on Facebook
+Follow us on X
+Sign up for alerts
+RSS feed
+About the journal
+About Scientific Reports
+Contact
+Journal policies
+Guide to referees
+Calls for Papers
+Editor's Choice
+Journal highlights
+Open Access Fees and Funding
+Publish with us
+For authors
+Language editing services
+Open access funding
+Submit manuscript
+Search
+Search articles by subject, keyword or author
+Show results from
+All journals
+This journal
+Search
+Advanced search
+Quick links
+Explore articles by subject
+Find a job
+Guide to authors
+Editorial policies
+Scientific Reports
+( Sci Rep )
+ISSN 2045-2322 (online)
+nature.com footer links
+About Nature Portfolio
+About us
+Press releases
+Press office
+Contact us
+Discover content
+Journals A-Z
+Articles by subject
+protocols.io
+Nature Index
+Publishing policies
+Nature portfolio policies
+Open access
+Author & Researcher services
+Reprints & permissions
+Research data
+Language editing
+Scientific editing
+Nature Masterclasses
+Research Solutions
+Libraries & institutions
+Librarian service & tools
+Librarian portal
+Open research
+Recommend to library
+Advertising & partnerships
+Advertising
+Partnerships & Services
+Media kits
+Branded
+content
+Professional development
+Nature Awards
+Nature Careers
+Nature
+Conferences
+Regional websites
+Nature Africa
+Nature China
+Nature India
+Nature Japan
+Nature Middle East
+Privacy
+Policy
+Use
+of cookies
+Your privacy choices/Manage cookies
+Legal
+notice
+Accessibility
+statement
+Terms & Conditions
+Your US state privacy rights
+© 2026 Springer Nature Limited
+Close banner
+Close
+Sign up for the Nature Briefing newsletter — what matters in science, free to your inbox daily.
+Email address
+Sign up
+I agree my information will be processed in accordance with the Nature and Springer Nature Limited Privacy Policy .
+Close banner
+Close
+Get the most important science stories of the day, free in your inbox.
+Sign up for Nature Briefing
