@@ -1,0 +1,29 @@
+{
+  "source": "D:\\HermesWorkspace\\Detictive\\data\\sources\\urfd\\fall-01-cam1.mp4",
+  "model": "yolo11n-pose.pt",
+  "protocol": "pose_motion_rule_baseline_v2",
+  "crop": "auto",
+  "fps": 30.0,
+  "source_frames": 160,
+  "processed_frames": 160,
+  "clip_score": 0.63621378387776,
+  "events": [
+    {
+      "track_id": 3,
+      "t_start": 3.7,
+      "t_end": 3.8,
+      "score": 0.5646899239564568
+    }
+  ],
+  "detector_predict_wallclock_ms": {
+    "mean": 93.49182562509668,
+    "p50": 66.88364999718033,
+    "p95": 80.50857001799154
+  },
+  "assumptions": [
+    "event matching protocol is provisional until organizer confirmation",
+    "timing covers model.predict wall clock only, not complete end-to-end latency",
+    "this smoke timing is not a submission benchmark",
+    "rule baseline is untrained; trained TCN will replace the primary temporal score"
+  ]
+}

@@ -2,13 +2,14 @@
 
 输入: data/omnifall/labels/*.csv (path,label,start,end,subject,cam,dataset,...)
 输出: data/annotations/events.csv
-  clip_id, dataset, label_id, label_name, t_start, t_end, is_fall_event, is_hard_negative
+  clip_id, dataset, subject, camera, label_id, label_name, event_semantics,
+  t_start, t_end, is_fall_process, is_post_fall_state, is_fall_incident,
+  is_hard_negative
 
-事件语义约定（对应 eval/metrics.py 的 GT Event）:
-- is_fall_event=1: label==fall(1)，即"跌倒过程"时间段——评测的 TP 对象
-- is_hard_negative=1: 易混日常动作 fall_en(2)/sit_down(3)/sitting(4)/lie_down(5)/lying(6)
-  /kneel_down(10)/kneeling(11)/squat_down(12)/squatting(13)——误报分析的重点
-- 其余（walk/stand_up/standing/other/crawl/jump）：普通背景类
+事件语义约定：
+- ``fall`` 与 ``fallen`` 分别保存为跌倒过程和跌倒后状态，并共同属于 fall incident；
+- sit/lie/kneel/squat/crawl 属于 hard negative；
+- 其余属于普通背景类。
 
 用法: python tools/prepare_omnifall_events.py [--labels-dir data/omnifall/labels] [--out data/annotations/events.csv]
 """
@@ -16,6 +17,7 @@ from __future__ import annotations
 
 import argparse
 import csv
+import math
 from pathlib import Path
 
 LABEL_NAMES = {
@@ -25,13 +27,24 @@ LABEL_NAMES = {
     14: "crawl", 15: "jump",
 }
 FALL_LABEL = 1
-HARD_NEGATIVES = {2, 3, 4, 5, 6, 10, 11, 12, 13}
+POST_FALL_LABEL = 2
+HARD_NEGATIVES = {3, 4, 5, 6, 10, 11, 12, 13, 14}
+
+
+def event_semantics(label: int) -> str:
+    if label == FALL_LABEL:
+        return "fall_process"
+    if label == POST_FALL_LABEL:
+        return "post_fall_state"
+    if label in HARD_NEGATIVES:
+        return "hard_negative"
+    return "background"
 
 
 def convert(labels_dir: Path, out_path: Path) -> dict:
     rows_out = []
     stats = {"files": 0, "segments": 0, "fall_events": 0, "hard_negatives": 0,
-             "by_dataset": {}}
+             "invalid_segments": 0, "by_dataset": {}}
     for csv_path in sorted(labels_dir.glob("*.csv")):
         if csv_path.stem == "label2id":
             continue
@@ -40,24 +53,36 @@ def convert(labels_dir: Path, out_path: Path) -> dict:
             for row in csv.DictReader(f):
                 label = int(row["label"])
                 ds = row["dataset"]
+                start = float(row["start"])
+                end = float(row["end"])
+                if not math.isfinite(start) or not math.isfinite(end) or end <= start:
+                    stats["invalid_segments"] += 1
+                    continue
                 rec = {
                     "clip_id": row["path"],
                     "dataset": ds,
+                    "subject": row.get("subject", ""),
+                    "camera": row.get("cam", ""),
                     "label_id": label,
                     "label_name": LABEL_NAMES.get(label, f"unk{label}"),
-                    "t_start": float(row["start"]),
-                    "t_end": float(row["end"]),
-                    "is_fall_event": int(label == FALL_LABEL),
+                    "event_semantics": event_semantics(label),
+                    "t_start": start,
+                    "t_end": end,
+                    "is_fall_process": int(label == FALL_LABEL),
+                    "is_post_fall_state": int(label == POST_FALL_LABEL),
+                    "is_fall_incident": int(label in {FALL_LABEL, POST_FALL_LABEL}),
                     "is_hard_negative": int(label in HARD_NEGATIVES),
                 }
                 rows_out.append(rec)
                 stats["segments"] += 1
-                stats["fall_events"] += rec["is_fall_event"]
+                stats["fall_events"] += rec["is_fall_incident"]
                 stats["hard_negatives"] += rec["is_hard_negative"]
                 d = stats["by_dataset"].setdefault(ds, {"segments": 0, "falls": 0})
                 d["segments"] += 1
-                d["falls"] += rec["is_fall_event"]
+                d["falls"] += rec["is_fall_incident"]
 
+    if not rows_out:
+        raise ValueError("没有合法事件片段，拒绝覆盖输出文件")
     out_path.parent.mkdir(parents=True, exist_ok=True)
     with open(out_path, "w", newline="", encoding="utf-8") as f:
         w = csv.DictWriter(f, fieldnames=list(rows_out[0].keys()))
@@ -73,7 +98,8 @@ if __name__ == "__main__":
     args = ap.parse_args()
     stats = convert(Path(args.labels_dir), Path(args.out))
     print(f"标注文件: {stats['files']} | 总片段: {stats['segments']} | "
-          f"跌倒事件: {stats['fall_events']} | 易混负例: {stats['hard_negatives']}")
+          f"跌倒事件: {stats['fall_events']} | 易混负例: {stats['hard_negatives']} | "
+          f"无效片段: {stats['invalid_segments']}")
     for ds, d in sorted(stats["by_dataset"].items()):
         print(f"  {ds:12s} segments={d['segments']:6d} falls={d['falls']:5d}")
     print(f"输出: {args.out}")

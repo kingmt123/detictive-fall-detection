@@ -1,0 +1,16 @@
+{
+  "model": "yolo11n-pose.pt",
+  "parameters": 2874462,
+  "parameters_million": 2.874462,
+  "fp32_weight_mb": 11.497848,
+  "image_size": 640,
+  "device": "0",
+  "warmup_runs": 10,
+  "measured_runs": 30,
+  "latency_ms": {
+    "mean": 48.38784334133379,
+    "p50": 47.91779999504797,
+    "p95": 52.81577502610162,
+    "min": 41.9357999926433
+  }
+}

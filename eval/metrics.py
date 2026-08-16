@@ -13,7 +13,9 @@
 """
 from __future__ import annotations
 
-from dataclasses import dataclass, field
+import math
+from dataclasses import dataclass
+from typing import Literal
 
 
 @dataclass(frozen=True)
@@ -25,8 +27,12 @@ class Event:
     score: float = 1.0
 
     def __post_init__(self):
-        if self.t_end < self.t_start:
-            raise ValueError(f"t_end({self.t_end}) < t_start({self.t_start})")
+        if not isinstance(self.clip_id, str) or not self.clip_id:
+            raise ValueError("clip_id 必须是非空字符串")
+        if not all(math.isfinite(value) for value in (self.t_start, self.t_end, self.score)):
+            raise ValueError("事件时间与分数必须是有限数值")
+        if self.t_end <= self.t_start:
+            raise ValueError(f"t_end({self.t_end}) 必须大于 t_start({self.t_start})")
 
 
 def temporal_iou(a: Event, b: Event) -> float:
@@ -38,27 +44,62 @@ def temporal_iou(a: Event, b: Event) -> float:
 def match_events(
     gts: list[Event], preds: list[Event], match_iou: float = 0.3
 ) -> tuple[list[tuple[Event, Event]], list[Event], list[Event]]:
-    """贪心匹配：按预测分数从高到低，匹配 IoU 最大且达标的未匹配 GT。
+    """最大基数一对一匹配；高分预测优先，同分时不依赖输入排列。
 
     Returns: (matches, unmatched_preds[FP], unmatched_gts[FN])
     """
-    matched_gt: set[int] = set()
-    matches: list[tuple[Event, Event]] = []
-    unmatched_preds: list[Event] = []
-    for p in sorted(preds, key=lambda e: -e.score):
-        best_i, best_iou = -1, match_iou
-        for i, g in enumerate(gts):
-            if i in matched_gt or g.clip_id != p.clip_id:
+    if not 0.0 <= match_iou <= 1.0:
+        raise ValueError("match_iou 必须在 [0, 1] 内")
+    pred_order = sorted(
+        range(len(preds)),
+        key=lambda i: (
+            -preds[i].score,
+            preds[i].clip_id,
+            preds[i].t_start,
+            preds[i].t_end,
+        ),
+    )
+    adjacency: dict[int, list[int]] = {}
+    for pred_i in pred_order:
+        pred = preds[pred_i]
+        candidates = [
+            (gt_i, temporal_iou(gt, pred))
+            for gt_i, gt in enumerate(gts)
+            if gt.clip_id == pred.clip_id and temporal_iou(gt, pred) >= match_iou
+        ]
+        adjacency[pred_i] = [
+            gt_i
+            for gt_i, _ in sorted(
+                candidates,
+                key=lambda item: (
+                    -item[1],
+                    gts[item[0]].clip_id,
+                    gts[item[0]].t_start,
+                    gts[item[0]].t_end,
+                ),
+            )
+        ]
+
+    gt_to_pred: dict[int, int] = {}
+
+    def assign(pred_i: int, seen_gts: set[int]) -> bool:
+        for gt_i in adjacency[pred_i]:
+            if gt_i in seen_gts:
                 continue
-            iou = temporal_iou(g, p)
-            if iou >= best_iou:
-                best_i, best_iou = i, iou
-        if best_i >= 0:
-            matched_gt.add(best_i)
-            matches.append((gts[best_i], p))
-        else:
-            unmatched_preds.append(p)
-    unmatched_gts = [g for i, g in enumerate(gts) if i not in matched_gt]
+            seen_gts.add(gt_i)
+            owner = gt_to_pred.get(gt_i)
+            if owner is None or assign(owner, seen_gts):
+                gt_to_pred[gt_i] = pred_i
+                return True
+        return False
+
+    for pred_i in pred_order:
+        assign(pred_i, set())
+
+    matched_pred = set(gt_to_pred.values())
+    matches = [(gts[gt_i], preds[pred_i]) for gt_i, pred_i in gt_to_pred.items()]
+    unmatched_preds = [pred for i, pred in enumerate(preds) if i not in matched_pred]
+    unmatched_gts = [gt for i, gt in enumerate(gts) if i not in gt_to_pred]
     return matches, unmatched_preds, unmatched_gts
 
 
@@ -76,6 +117,8 @@ def pr_curve(
     gts: list[Event], preds: list[Event], match_iou: float = 0.3
 ) -> list[PRPoint]:
     """对预测分数扫阈值，产出 P-R 曲线上的点（按阈值降序）。"""
+    if not 0.0 <= match_iou <= 1.0:
+        raise ValueError("match_iou 必须在 [0, 1] 内")
     n_gt = len(gts)
     points: list[PRPoint] = []
     scores = sorted({p.score for p in preds}, reverse=True)
@@ -91,6 +134,39 @@ def pr_curve(
     return points
 
 
+def clip_pr_curve(
+    gt_by_clip: dict[str, bool], pred_scores: dict[str, float]
+) -> list[PRPoint]:
+    """整段视频二分类的 P-R 曲线。
+
+    所有 GT clip 必须显式提供预测分数。缺失预测和不在 GT 的额外预测都会被拒绝，
+    防止批处理失败或拼写错误被静默计入指标。
+    """
+    unknown = set(pred_scores) - set(gt_by_clip)
+    if unknown:
+        raise ValueError(f"预测包含未知 clip: {sorted(unknown)[:5]}")
+    missing = set(gt_by_clip) - set(pred_scores)
+    if missing:
+        raise ValueError(f"预测缺少 clip: {sorted(missing)[:5]}")
+    if any(type(label) is not bool for label in gt_by_clip.values()):
+        raise TypeError("clip 标签必须是 bool")
+    scores = {clip: float(pred_scores[clip]) for clip in gt_by_clip}
+    if any(not math.isfinite(score) for score in scores.values()):
+        raise ValueError("clip 预测分数必须是有限数值")
+    thresholds = sorted(set(scores.values()), reverse=True)
+    n_positive = sum(gt_by_clip.values())
+    points: list[PRPoint] = []
+    for threshold in thresholds:
+        predicted = {clip for clip, score in scores.items() if score >= threshold}
+        tp = sum(gt_by_clip[clip] for clip in predicted)
+        fp = len(predicted) - tp
+        fn = n_positive - tp
+        precision = tp / (tp + fp) if tp + fp else 0.0
+        recall = tp / n_positive if n_positive else 0.0
+        points.append(PRPoint(threshold, precision, recall, tp, fp, fn))
+    return points
+
+
 def precision_at_recall(curve: list[PRPoint], target_recall: float) -> float:
     """召回率 >= target 的所有工作点中的最大精准率；达不到该召回则返回 0。"""
     feasible = [pt.precision for pt in curve if pt.recall >= target_recall]
@@ -98,10 +174,36 @@ def precision_at_recall(curve: list[PRPoint], target_recall: float) -> float:
 
 
 def competition_map(
-    gts: list[Event], preds: list[Event], match_iou: float = 0.3
+    gts: list[Event] | dict[str, bool],
+    preds: list[Event] | dict[str, float],
+    *,
+    mode: Literal["event", "clip"],
+    match_iou: float = 0.3,
 ) -> dict:
-    """赛题 MAP = (P@R90 + P@R95) / 2。"""
-    curve = pr_curve(gts, preds, match_iou)
+    """赛题 MAP；同时返回内部比例值和官方公式使用的百分数值。
+
+    ``event`` 是本项目的代理事件协议；``clip`` 用于官方若采用整段二分类时。
+    """
+    if mode == "event":
+        if not isinstance(gts, list) or not isinstance(preds, list):
+            raise TypeError("event 模式要求 Event 列表")
+        if any(not isinstance(event, Event) for event in [*gts, *preds]):
+            raise TypeError("event 模式要求 Event 列表")
+        curve = pr_curve(gts, preds, match_iou)
+    elif mode == "clip":
+        if not isinstance(gts, dict) or not isinstance(preds, dict):
+            raise TypeError("clip 模式要求 clip->label/score 字典")
+        curve = clip_pr_curve(gts, preds)
+    else:
+        raise ValueError(f"未知评测模式: {mode}")
     p90 = precision_at_recall(curve, 0.90)
     p95 = precision_at_recall(curve, 0.95)
-    return {"p_at_r90": p90, "p_at_r95": p95, "map": (p90 + p95) / 2, "curve": curve}
+    map_ratio = (p90 + p95) / 2
+    return {
+        "p_at_r90": p90,
+        "p_at_r95": p95,
+        "map": map_ratio,
+        "map_percent": map_ratio * 100.0,
+        "curve": curve,
+        "mode": mode,
+    }

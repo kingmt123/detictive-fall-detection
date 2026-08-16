@@ -1,5 +1,8 @@
 data/
 runs/
+reports/*.mp4
+reports/*.jpg
+reports/*_debug.json
 *.pt
 *.onnx
 __pycache__/
