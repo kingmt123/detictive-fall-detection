@@ -26,3 +26,18 @@
 - 下载目录：`data/sources/urfd/`
 
 （下载结果待补充）
+
+---
+
+## 主线接管记录（2026-08-16 16:10，Agent 超时后）
+
+- **URFD**：已确认单文件直链模式 `http://fenix.ur.edu.pl/~mkepski/ds/data/{fall|adl}-XX-camY.mp4`，主线用后台 curl 循环批量下载中（fall-01..30 × cam0/cam1 + adl-01..40 × cam0 + 加速度 CSV）。
+- **Le2i**：GitHub 搜索无可用视频镜像（YifeiYang210 仓库仅 59KB 文档）；官网需申请。HF 上仅有 `seanphan/le2i-sentinel-frames`（抽帧版）。**结论：暂缓**，OF-Syn+URFD 够用再回来补。
+- **HF 候选数据集（待 D2 评估适配性）**：
+  - `Nshisei/multimodal_multiangle_fall_detection_dataset`（多视角多模态，287 下载）
+  - `Simuletic/CCTV_Incident_Dataset_Fall_Lying_Down_Detection`（CCTV 风格，206 下载）
+  - `mervinpraison/upfall-detection-actual`（疑似 UP-Fall 子集）
+  - `DeZan/fall-detection`（107 下载）
+- **Kaggle payutch**：无 API key（~/.kaggle 不存在），且 16GB 标注不统一，维持"备选放弃"判断。
+- **OF-Syn**：9.7GB tar 后台断点续传下载中（data/omnifall/data_files/）。
+- **教训**：下载类任务不再派 Agent（600s 超时限制 + 慢速站点易卡死），改由主线 `terminal(background=true)` 直接跑 curl 循环。
