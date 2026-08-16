@@ -1,0 +1,1206 @@
+<html lang="en" xmlns:m="http://www.w3.org/1998/Math/MathML">
+
+<head>
+    <meta charset="utf-8">
+    <title>UR Fall Detection Dataset</title>
+    <link rel="stylesheet" href="http://fonts.googleapis.com/css?family=UnifrakturMaguntia">
+    <link rel="stylesheet" href="mathscribe/jqmath-0.4.0.css">
+    <script src="mathscribe/jquery-1.4.3.min.js"></script>
+    <script src="mathscribe/jqmath-etc-0.4.0.min.js"></script>
+</head>
+<body>
+    <h1 align="center"><font size="+4"><b><font size="+3">UR Fall Detection
+        Dataset</font></b></font>
+    </h1>
+    <h2 align="center"><a href="mailto:mkepski@ur.edu.pl"><b>Michal Kępski</b></a><br />
+        Interdisciplinary Centre for Computational Modelling<br />
+        University of Rzeszow<br />
+    </h2>
+    <br />
+    <br />
+    <br />
+    <div style="float:left;">
+        <img src="preview-opt.gif" />
+    </div>
+    <div style="padding-left:20px; overflow:hidden; min-height: 350px;">
+        This dataset contains 70 (30 falls + 40 activities of daily living) sequences. Fall events are recorded with 2 Microsoft Kinect cameras and
+        corresponding accelerometric data. ADL events are recorded with only one device (camera 0) and accelerometer. Sensor data was collected using PS Move (60Hz) and
+        x-IMU (256Hz) devices.<br />
+        The dataset is organized as follows. Each row contains sequence of depth and RGB images for camera 0 and camera 1 (parallel to the floor and ceiling mounted, respectively), synchronization data, and raw accelerometer data.
+        Each video stream is stored in separate zip archive in form of png image sequence. Depth data is stored in PNG16 format and should be rescaled:   </br>
+        <p>$$d = {C_iP(x, y)}/65535$$</p>
+        where $ d $ is depth in millimeters, $ C_i $ is scale ratio for i-th camera and $P(x,y)$ is pixel value at position (x,y) of PNG16 image. Fall sequences: $C_0 = 6000$ and $C_1 = 3640$. ADLs: $C_0 = 7000$ 
+        <p>
+            <b>Synchronization data contains</b>: frame number, time in milliseconds since sequence start and interpolated accelerometric data $(SV_t_o_t_a_l)$ - corresponding to image frame. Note that the cameras are recorded independently, so they are not strictly synchronized (synchronization based on nearest timestamp value).
+        </p>
+        <p>  
+            <b>Raw accelerometric data</b> contains time in milliseconds since sequence start and accelerometer data: $SV_t_o_t_a_l , A_x , A_z , A_y$. All accelerometer data are in gravity units (g). Total sum vector is calculated as follows:
+        </p>
+        </br>$$SV_t_o_t_a_l = √{A_x^2 + A_y^2 + A_z^2}$$
+        <p>
+            If you use the dataset, please cite the following work: 
+        </p>
+        <p><b>
+            Bogdan Kwolek, Michal Kepski, Human fall detection on embedded platform using depth maps and wireless accelerometer, Computer Methods and Programs in Biomedicine, Volume 117, Issue 3, December 2014, Pages 489-501, ISSN 0169-2607 
+            </b> [<a href="http://home.agh.edu.pl/~bkw/research/pdf/2014/KwolekKepski_CMBP2014.pdf" title="This is an author's manuscript.">Link</a>]
+        </p>
+		
+		<p>
+		
+This work is licensed under a Creative Commons Attribution-NonCommercial-ShareAlike 4.0 International License and is intended for non-commercial academic use. If you are interested in using the dataset for commercial purposes please contact <a href="mailto:mkepski@ur.edu.pl">us</a>.
+		</p>
+    </div>
+    <br />
+    <h2> Fall sequences: </h2>
+    <br />
+
+	<div style=" margin-left: auto; margin-right: auto; width:1000px;">
+	<table border="1">
+		<tr>
+			<th rowspan="2">#</th>
+			<th colspan="2">Depth data</th>
+			<th colspan="2">RGB data</th>
+			<th rowspan="2">Synchronization data</th>
+			<th rowspan="2">Accelerometer data</th>
+			<th rowspan="2">Video</th>
+		</tr>
+		<tr>
+			<th>Camera 0</th>
+			<th>Camera 1</th>
+			<th>Camera 0</th>
+			<th>Camera 1</th>
+		</tr>
+		<tr>
+			<td>01</td>
+			<td><a href=
+				"./data/fall-01-cam0-d.zip">fall-01-cam0-d.zip</a></td>
+			<td><a href=
+				"./data/fall-01-cam1-d.zip">fall-01-cam1-d.zip</a></td>
+			<td><a href=
+				"./data/fall-01-cam0-rgb.zip">fall-01-cam0-rgb.zip</a></td>
+			<td><a href=
+				"./data/fall-01-cam1-rgb.zip">fall-01-cam1-rgb.zip</a></td>
+			<td><a href=
+				"./data/fall-01-data.csv">fall-01-data.csv</a></td>
+			<td><a href="./data/fall-01-acc.csv">fall-01-acc.csv</a></td>
+			<td><a href=
+				"./data/fall-01-cam0.mp4">cam0</a>
+				<a href="./data/fall-01-cam1.mp4">cam1</a>
+			</td>
+		</tr>
+		<tr>
+			<td>02</td>
+			<td><a href=
+				"./data/fall-02-cam0-d.zip">fall-02-cam0-d.zip</a></td>
+			<td><a href=
+				"./data/fall-02-cam1-d.zip">fall-02-cam1-d.zip</a></td>
+			<td><a href=
+				"./data/fall-02-cam0-rgb.zip">fall-02-cam0-rgb.zip</a></td>
+			<td><a href=
+				"./data/fall-02-cam1-rgb.zip">fall-02-cam1-rgb.zip</a></td>
+			<td><a href=
+				"./data/fall-02-data.csv">fall-02-data.csv</a></td>
+			<td><a href="./data/fall-02-acc.csv">fall-02-acc.csv</a></td>
+			<td><a href=
+				"./data/fall-02-cam0.mp4">cam0</a>
+				<a href="./data/fall-02-cam1.mp4">cam1</a>
+			</td>
+		</tr>
+		<tr>
+			<td>03</td>
+			<td><a href=
+				"./data/fall-03-cam0-d.zip">fall-03-cam0-d.zip</a></td>
+			<td><a href=
+				"./data/fall-03-cam1-d.zip">fall-03-cam1-d.zip</a></td>
+			<td><a href=
+				"./data/fall-03-cam0-rgb.zip">fall-03-cam0-rgb.zip</a></td>
+			<td><a href=
+				"./data/fall-03-cam1-rgb.zip">fall-03-cam1-rgb.zip</a></td>
+			<td><a href=
+				"./data/fall-03-data.csv">fall-03-data.csv</a></td>
+			<td><a href="./data/fall-03-acc.csv">fall-03-acc.csv</a></td>
+			<td><a href=
+				"./data/fall-03-cam0.mp4">cam0</a>
+				<a href="./data/fall-03-cam1.mp4">cam1</a>
+			</td>
+		</tr>
+		<tr>
+			<td>04</td>
+			<td><a href=
+				"./data/fall-04-cam0-d.zip">fall-04-cam0-d.zip</a></td>
+			<td><a href=
+				"./data/fall-04-cam1-d.zip">fall-04-cam1-d.zip</a></td>
+			<td><a href=
+				"./data/fall-04-cam0-rgb.zip">fall-04-cam0-rgb.zip</a></td>
+			<td><a href=
+				"./data/fall-04-cam1-rgb.zip">fall-04-cam1-rgb.zip</a></td>
+			<td><a href=
+				"./data/fall-04-data.csv">fall-04-data.csv</a></td>
+			<td><a href="./data/fall-04-acc.csv">fall-04-acc.csv</a></td>
+			<td><a href=
+				"./data/fall-04-cam0.mp4">cam0</a>
+				<a href="./data/fall-04-cam1.mp4">cam1</a>
+			</td>
+		</tr>
+		<tr>
+			<td>05</td>
+			<td><a href=
+				"./data/fall-05-cam0-d.zip">fall-05-cam0-d.zip</a></td>
+			<td><a href=
+				"./data/fall-05-cam1-d.zip">fall-05-cam1-d.zip</a></td>
+			<td><a href=
+				"./data/fall-05-cam0-rgb.zip">fall-05-cam0-rgb.zip</a></td>
+			<td><a href=
+				"./data/fall-05-cam1-rgb.zip">fall-05-cam1-rgb.zip</a></td>
+			<td><a href=
+				"./data/fall-05-data.csv">fall-05-data.csv</a></td>
+			<td><a href="./data/fall-05-acc.csv">fall-05-acc.csv</a></td>
+			<td><a href=
+				"./data/fall-05-cam0.mp4">cam0</a>
+				<a href="./data/fall-05-cam1.mp4">cam1</a>
+			</td>
+		</tr>
+		<tr>
+			<td>06</td>
+			<td><a href=
+				"./data/fall-06-cam0-d.zip">fall-06-cam0-d.zip</a></td>
+			<td><a href=
+				"./data/fall-06-cam1-d.zip">fall-06-cam1-d.zip</a></td>
+			<td><a href=
+				"./data/fall-06-cam0-rgb.zip">fall-06-cam0-rgb.zip</a></td>
+			<td><a href=
+				"./data/fall-06-cam1-rgb.zip">fall-06-cam1-rgb.zip</a></td>
+			<td><a href=
+				"./data/fall-06-data.csv">fall-06-data.csv</a></td>
+			<td><a href="./data/fall-06-acc.csv">fall-06-acc.csv</a></td>
+			<td><a href=
+				"./data/fall-06-cam0.mp4">cam0</a>
+				<a href="./data/fall-06-cam1.mp4">cam1</a>
+			</td>
+		</tr>
+		<tr>
+			<td>07</td>
+			<td><a href=
+				"./data/fall-07-cam0-d.zip">fall-07-cam0-d.zip</a></td>
+			<td><a href=
+				"./data/fall-07-cam1-d.zip">fall-07-cam1-d.zip</a></td>
+			<td><a href=
+				"./data/fall-07-cam0-rgb.zip">fall-07-cam0-rgb.zip</a></td>
+			<td><a href=
+				"./data/fall-07-cam1-rgb.zip">fall-07-cam1-rgb.zip</a></td>
+			<td><a href=
+				"./data/fall-07-data.csv">fall-07-data.csv</a></td>
+			<td><a href="./data/fall-07-acc.csv">fall-07-acc.csv</a></td>
+			<td><a href=
+				"./data/fall-07-cam0.mp4">cam0</a>
+				<a href="./data/fall-07-cam1.mp4">cam1</a>
+			</td>
+		</tr>
+		<tr>
+			<td>08</td>
+			<td><a href=
+				"./data/fall-08-cam0-d.zip">fall-08-cam0-d.zip</a></td>
+			<td><a href=
+				"./data/fall-08-cam1-d.zip">fall-08-cam1-d.zip</a></td>
+			<td><a href=
+				"./data/fall-08-cam0-rgb.zip">fall-08-cam0-rgb.zip</a></td>
+			<td><a href=
+				"./data/fall-08-cam1-rgb.zip">fall-08-cam1-rgb.zip</a></td>
+			<td><a href=
+				"./data/fall-08-data.csv">fall-08-data.csv</a></td>
+			<td><a href="./data/fall-08-acc.csv">fall-08-acc.csv</a></td>
+			<td><a href=
+				"./data/fall-08-cam0.mp4">cam0</a>
+				<a href="./data/fall-08-cam1.mp4">cam1</a>
+			</td>
+		</tr>
+		<tr>
+			<td>09</td>
+			<td><a href=
+				"./data/fall-09-cam0-d.zip">fall-09-cam0-d.zip</a></td>
+			<td><a href=
+				"./data/fall-09-cam1-d.zip">fall-09-cam1-d.zip</a></td>
+			<td><a href=
+				"./data/fall-09-cam0-rgb.zip">fall-09-cam0-rgb.zip</a></td>
+			<td><a href=
+				"./data/fall-09-cam1-rgb.zip">fall-09-cam1-rgb.zip</a></td>
+			<td><a href=
+				"./data/fall-09-data.csv">fall-09-data.csv</a></td>
+			<td><a href="./data/fall-09-acc.csv">fall-09-acc.csv</a></td>
+			<td><a href=
+				"./data/fall-09-cam0.mp4">cam0</a>
+				<a href="./data/fall-09-cam1.mp4">cam1</a>
+			</td>
+		</tr>
+		<tr>
+			<td>10</td>
+			<td><a href=
+				"./data/fall-10-cam0-d.zip">fall-10-cam0-d.zip</a></td>
+			<td><a href=
+				"./data/fall-10-cam1-d.zip">fall-10-cam1-d.zip</a></td>
+			<td><a href=
+				"./data/fall-10-cam0-rgb.zip">fall-10-cam0-rgb.zip</a></td>
+			<td><a href=
+				"./data/fall-10-cam1-rgb.zip">fall-10-cam1-rgb.zip</a></td>
+			<td><a href=
+				"./data/fall-10-data.csv">fall-10-data.csv</a></td>
+			<td><a href="./data/fall-10-acc.csv">fall-10-acc.csv</a></td>
+			<td><a href=
+				"./data/fall-10-cam0.mp4">cam0</a>
+				<a href="./data/fall-10-cam1.mp4">cam1</a>
+			</td>
+		</tr>
+		<tr>
+			<td>11</td>
+			<td><a href=
+				"./data/fall-11-cam0-d.zip">fall-11-cam0-d.zip</a></td>
+			<td><a href=
+				"./data/fall-11-cam1-d.zip">fall-11-cam1-d.zip</a></td>
+			<td><a href=
+				"./data/fall-11-cam0-rgb.zip">fall-11-cam0-rgb.zip</a></td>
+			<td><a href=
+				"./data/fall-11-cam1-rgb.zip">fall-11-cam1-rgb.zip</a></td>
+			<td><a href=
+				"./data/fall-11-data.csv">fall-11-data.csv</a></td>
+			<td><a href="./data/fall-11-acc.csv">fall-11-acc.csv</a></td>
+			<td><a href=
+				"./data/fall-11-cam0.mp4">cam0</a>
+				<a href="./data/fall-11-cam1.mp4">cam1</a>
+			</td>
+		</tr>
+		<tr>
+			<td>12</td>
+			<td><a href=
+				"./data/fall-12-cam0-d.zip">fall-12-cam0-d.zip</a></td>
+			<td><a href=
+				"./data/fall-12-cam1-d.zip">fall-12-cam1-d.zip</a></td>
+			<td><a href=
+				"./data/fall-12-cam0-rgb.zip">fall-12-cam0-rgb.zip</a></td>
+			<td><a href=
+				"./data/fall-12-cam1-rgb.zip">fall-12-cam1-rgb.zip</a></td>
+			<td><a href=
+				"./data/fall-12-data.csv">fall-12-data.csv</a></td>
+			<td><a href="./data/fall-12-acc.csv">fall-12-acc.csv</a></td>
+			<td><a href=
+				"./data/fall-12-cam0.mp4">cam0</a>
+				<a href="./data/fall-12-cam1.mp4">cam1</a>
+			</td>
+		</tr>
+		<tr>
+			<td>13</td>
+			<td><a href=
+				"./data/fall-13-cam0-d.zip">fall-13-cam0-d.zip</a></td>
+			<td><a href=
+				"./data/fall-13-cam1-d.zip">fall-13-cam1-d.zip</a></td>
+			<td><a href=
+				"./data/fall-13-cam0-rgb.zip">fall-13-cam0-rgb.zip</a></td>
+			<td><a href=
+				"./data/fall-13-cam1-rgb.zip">fall-13-cam1-rgb.zip</a></td>
+			<td><a href=
+				"./data/fall-13-data.csv">fall-13-data.csv</a></td>
+			<td><a href="./data/fall-13-acc.csv">fall-13-acc.csv</a></td>
+			<td><a href=
+				"./data/fall-13-cam0.mp4">cam0</a>
+				<a href="./data/fall-13-cam1.mp4">cam1</a>
+			</td>
+		</tr>
+		<tr>
+			<td>14</td>
+			<td><a href=
+				"./data/fall-14-cam0-d.zip">fall-14-cam0-d.zip</a></td>
+			<td><a href=
+				"./data/fall-14-cam1-d.zip">fall-14-cam1-d.zip</a></td>
+			<td><a href=
+				"./data/fall-14-cam0-rgb.zip">fall-14-cam0-rgb.zip</a></td>
+			<td><a href=
+				"./data/fall-14-cam1-rgb.zip">fall-14-cam1-rgb.zip</a></td>
+			<td><a href=
+				"./data/fall-14-data.csv">fall-14-data.csv</a></td>
+			<td><a href="./data/fall-14-acc.csv">fall-14-acc.csv</a></td>
+			<td><a href=
+				"./data/fall-14-cam0.mp4">cam0</a>
+				<a href="./data/fall-14-cam1.mp4">cam1</a>
+			</td>
+		</tr>
+		<tr>
+			<td>15</td>
+			<td><a href=
+				"./data/fall-15-cam0-d.zip">fall-15-cam0-d.zip</a></td>
+			<td><a href=
+				"./data/fall-15-cam1-d.zip">fall-15-cam1-d.zip</a></td>
+			<td><a href=
+				"./data/fall-15-cam0-rgb.zip">fall-15-cam0-rgb.zip</a></td>
+			<td><a href=
+				"./data/fall-15-cam1-rgb.zip">fall-15-cam1-rgb.zip</a></td>
+			<td><a href=
+				"./data/fall-15-data.csv">fall-15-data.csv</a></td>
+			<td><a href="./data/fall-15-acc.csv">fall-15-acc.csv</a></td>
+			<td><a href=
+				"./data/fall-15-cam0.mp4">cam0</a>
+				<a href="./data/fall-15-cam1.mp4">cam1</a>
+			</td>
+		</tr>
+		<tr>
+			<td>16</td>
+			<td><a href=
+				"./data/fall-16-cam0-d.zip">fall-16-cam0-d.zip</a></td>
+			<td><a href=
+				"./data/fall-16-cam1-d.zip">fall-16-cam1-d.zip</a></td>
+			<td><a href=
+				"./data/fall-16-cam0-rgb.zip">fall-16-cam0-rgb.zip</a></td>
+			<td><a href=
+				"./data/fall-16-cam1-rgb.zip">fall-16-cam1-rgb.zip</a></td>
+			<td><a href=
+				"./data/fall-16-data.csv">fall-16-data.csv</a></td>
+			<td><a href="./data/fall-16-acc.csv">fall-16-acc.csv</a></td>
+			<td><a href=
+				"./data/fall-16-cam0.mp4">cam0</a>
+				<a href="./data/fall-16-cam1.mp4">cam1</a>
+			</td>
+		</tr>
+		<tr>
+			<td>17</td>
+			<td><a href=
+				"./data/fall-17-cam0-d.zip">fall-17-cam0-d.zip</a></td>
+			<td><a href=
+				"./data/fall-17-cam1-d.zip">fall-17-cam1-d.zip</a></td>
+			<td><a href=
+				"./data/fall-17-cam0-rgb.zip">fall-17-cam0-rgb.zip</a></td>
+			<td><a href=
+				"./data/fall-17-cam1-rgb.zip">fall-17-cam1-rgb.zip</a></td>
+			<td><a href=
+				"./data/fall-17-data.csv">fall-17-data.csv</a></td>
+			<td><a href="./data/fall-17-acc.csv">fall-17-acc.csv</a></td>
+			<td><a href=
+				"./data/fall-17-cam0.mp4">cam0</a>
+				<a href="./data/fall-17-cam1.mp4">cam1</a>
+			</td>
+		</tr>
+		<tr>
+			<td>18</td>
+			<td><a href=
+				"./data/fall-18-cam0-d.zip">fall-18-cam0-d.zip</a></td>
+			<td><a href=
+				"./data/fall-18-cam1-d.zip">fall-18-cam1-d.zip</a></td>
+			<td><a href=
+				"./data/fall-18-cam0-rgb.zip">fall-18-cam0-rgb.zip</a></td>
+			<td><a href=
+				"./data/fall-18-cam1-rgb.zip">fall-18-cam1-rgb.zip</a></td>
+			<td><a href=
+				"./data/fall-18-data.csv">fall-18-data.csv</a></td>
+			<td><a href="./data/fall-18-acc.csv">fall-18-acc.csv</a></td>
+			<td><a href=
+				"./data/fall-18-cam0.mp4">cam0</a>
+				<a href="./data/fall-18-cam1.mp4">cam1</a>
+			</td>
+		</tr>
+		<tr>
+			<td>19</td>
+			<td><a href=
+				"./data/fall-19-cam0-d.zip">fall-19-cam0-d.zip</a></td>
+			<td><a href=
+				"./data/fall-19-cam1-d.zip">fall-19-cam1-d.zip</a></td>
+			<td><a href=
+				"./data/fall-19-cam0-rgb.zip">fall-19-cam0-rgb.zip</a></td>
+			<td><a href=
+				"./data/fall-19-cam1-rgb.zip">fall-19-cam1-rgb.zip</a></td>
+			<td><a href=
+				"./data/fall-19-data.csv">fall-19-data.csv</a></td>
+			<td><a href="./data/fall-19-acc.csv">fall-19-acc.csv</a></td>
+			<td><a href=
+				"./data/fall-19-cam0.mp4">cam0</a>
+				<a href="./data/fall-19-cam1.mp4">cam1</a>
+			</td>
+		</tr>
+		<tr>
+			<td>20</td>
+			<td><a href=
+				"./data/fall-20-cam0-d.zip">fall-20-cam0-d.zip</a></td>
+			<td><a href=
+				"./data/fall-20-cam1-d.zip">fall-20-cam1-d.zip</a></td>
+			<td><a href=
+				"./data/fall-20-cam0-rgb.zip">fall-20-cam0-rgb.zip</a></td>
+			<td><a href=
+				"./data/fall-20-cam1-rgb.zip">fall-20-cam1-rgb.zip</a></td>
+			<td><a href=
+				"./data/fall-20-data.csv">fall-20-data.csv</a></td>
+			<td><a href="./data/fall-20-acc.csv">fall-20-acc.csv</a></td>
+			<td><a href=
+				"./data/fall-20-cam0.mp4">cam0</a>
+				<a href="./data/fall-20-cam1.mp4">cam1</a>
+			</td>
+		</tr>
+		<tr>
+			<td>21</td>
+			<td><a href=
+				"./data/fall-21-cam0-d.zip">fall-21-cam0-d.zip</a></td>
+			<td><a href=
+				"./data/fall-21-cam1-d.zip">fall-21-cam1-d.zip</a></td>
+			<td><a href=
+				"./data/fall-21-cam0-rgb.zip">fall-21-cam0-rgb.zip</a></td>
+			<td><a href=
+				"./data/fall-21-cam1-rgb.zip">fall-21-cam1-rgb.zip</a></td>
+			<td><a href=
+				"./data/fall-21-data.csv">fall-21-data.csv</a></td>
+			<td><a href="./data/fall-21-acc.csv">fall-21-acc.csv</a></td>
+			<td><a href=
+				"./data/fall-21-cam0.mp4">cam0</a>
+				<a href="./data/fall-21-cam1.mp4">cam1</a>
+			</td>
+		</tr>
+		<tr>
+			<td>22</td>
+			<td><a href=
+				"./data/fall-22-cam0-d.zip">fall-22-cam0-d.zip</a></td>
+			<td><a href=
+				"./data/fall-22-cam1-d.zip">fall-22-cam1-d.zip</a></td>
+			<td><a href=
+				"./data/fall-22-cam0-rgb.zip">fall-22-cam0-rgb.zip</a></td>
+			<td><a href=
+				"./data/fall-22-cam1-rgb.zip">fall-22-cam1-rgb.zip</a></td>
+			<td><a href=
+				"./data/fall-22-data.csv">fall-22-data.csv</a></td>
+			<td><a href="./data/fall-22-acc.csv">fall-22-acc.csv</a></td>
+			<td><a href=
+				"./data/fall-22-cam0.mp4">cam0</a>
+				<a href="./data/fall-22-cam1.mp4">cam1</a>
+			</td>
+		</tr>
+		<tr>
+			<td>23</td>
+			<td><a href=
+				"./data/fall-23-cam0-d.zip">fall-23-cam0-d.zip</a></td>
+			<td><a href=
+				"./data/fall-23-cam1-d.zip">fall-23-cam1-d.zip</a></td>
+			<td><a href=
+				"./data/fall-23-cam0-rgb.zip">fall-23-cam0-rgb.zip</a></td>
+			<td><a href=
+				"./data/fall-23-cam1-rgb.zip">fall-23-cam1-rgb.zip</a></td>
+			<td><a href=
+				"./data/fall-23-data.csv">fall-23-data.csv</a></td>
+			<td><a href="./data/fall-23-acc.csv">fall-23-acc.csv</a></td>
+			<td><a href=
+				"./data/fall-23-cam0.mp4">cam0</a>
+				<a href="./data/fall-23-cam1.mp4">cam1</a>
+			</td>
+		</tr>
+		<tr>
+			<td>24</td>
+			<td><a href=
+				"./data/fall-24-cam0-d.zip">fall-24-cam0-d.zip</a></td>
+			<td><a href=
+				"./data/fall-24-cam1-d.zip">fall-24-cam1-d.zip</a></td>
+			<td><a href=
+				"./data/fall-24-cam0-rgb.zip">fall-24-cam0-rgb.zip</a></td>
+			<td><a href=
+				"./data/fall-24-cam1-rgb.zip">fall-24-cam1-rgb.zip</a></td>
+			<td><a href=
+				"./data/fall-24-data.csv">fall-24-data.csv</a></td>
+			<td><a href="./data/fall-24-acc.csv">fall-24-acc.csv</a></td>
+			<td><a href=
+				"./data/fall-24-cam0.mp4">cam0</a>
+				<a href="./data/fall-24-cam1.mp4">cam1</a>
+			</td>
+		</tr>
+		<tr>
+			<td>25</td>
+			<td><a href=
+				"./data/fall-25-cam0-d.zip">fall-25-cam0-d.zip</a></td>
+			<td><a href=
+				"./data/fall-25-cam1-d.zip">fall-25-cam1-d.zip</a></td>
+			<td><a href=
+				"./data/fall-25-cam0-rgb.zip">fall-25-cam0-rgb.zip</a></td>
+			<td><a href=
+				"./data/fall-25-cam1-rgb.zip">fall-25-cam1-rgb.zip</a></td>
+			<td><a href=
+				"./data/fall-25-data.csv">fall-25-data.csv</a></td>
+			<td><a href="./data/fall-25-acc.csv">fall-25-acc.csv</a></td>
+			<td><a href=
+				"./data/fall-25-cam0.mp4">cam0</a>
+				<a href="./data/fall-25-cam1.mp4">cam1</a>
+			</td>
+		</tr>
+		<tr>
+			<td>26</td>
+			<td><a href=
+				"./data/fall-26-cam0-d.zip">fall-26-cam0-d.zip</a></td>
+			<td><a href=
+				"./data/fall-26-cam1-d.zip">fall-26-cam1-d.zip</a></td>
+			<td><a href=
+				"./data/fall-26-cam0-rgb.zip">fall-26-cam0-rgb.zip</a></td>
+			<td><a href=
+				"./data/fall-26-cam1-rgb.zip">fall-26-cam1-rgb.zip</a></td>
+			<td><a href=
+				"./data/fall-26-data.csv">fall-26-data.csv</a></td>
+			<td><a href="./data/fall-26-acc.csv">fall-26-acc.csv</a></td>
+			<td><a href=
+				"./data/fall-26-cam0.mp4">cam0</a>
+				<a href="./data/fall-26-cam1.mp4">cam1</a>
+			</td>
+		</tr>
+		<tr>
+			<td>27</td>
+			<td><a href=
+				"./data/fall-27-cam0-d.zip">fall-27-cam0-d.zip</a></td>
+			<td><a href=
+				"./data/fall-27-cam1-d.zip">fall-27-cam1-d.zip</a></td>
+			<td><a href=
+				"./data/fall-27-cam0-rgb.zip">fall-27-cam0-rgb.zip</a></td>
+			<td><a href=
+				"./data/fall-27-cam1-rgb.zip">fall-27-cam1-rgb.zip</a></td>
+			<td><a href=
+				"./data/fall-27-data.csv">fall-27-data.csv</a></td>
+			<td><a href="./data/fall-27-acc.csv">fall-27-acc.csv</a></td>
+			<td><a href=
+				"./data/fall-27-cam0.mp4">cam0</a>
+				<a href="./data/fall-27-cam1.mp4">cam1</a>
+			</td>
+		</tr>
+		<tr>
+			<td>28</td>
+			<td><a href=
+				"./data/fall-28-cam0-d.zip">fall-28-cam0-d.zip</a></td>
+			<td><a href=
+				"./data/fall-28-cam1-d.zip">fall-28-cam1-d.zip</a></td>
+			<td><a href=
+				"./data/fall-28-cam0-rgb.zip">fall-28-cam0-rgb.zip</a></td>
+			<td><a href=
+				"./data/fall-28-cam1-rgb.zip">fall-28-cam1-rgb.zip</a></td>
+			<td><a href=
+				"./data/fall-28-data.csv">fall-28-data.csv</a></td>
+			<td><a href="./data/fall-28-acc.csv">fall-28-acc.csv</a></td>
+			<td><a href=
+				"./data/fall-28-cam0.mp4">cam0</a>
+				<a href="./data/fall-28-cam1.mp4">cam1</a>
+			</td>
+		</tr>
+		<tr>
+			<td>29</td>
+			<td><a href=
+				"./data/fall-29-cam0-d.zip">fall-29-cam0-d.zip</a></td>
+			<td><a href=
+				"./data/fall-29-cam1-d.zip">fall-29-cam1-d.zip</a></td>
+			<td><a href=
+				"./data/fall-29-cam0-rgb.zip">fall-29-cam0-rgb.zip</a></td>
+			<td><a href=
+				"./data/fall-29-cam1-rgb.zip">fall-29-cam1-rgb.zip</a></td>
+			<td><a href=
+				"./data/fall-29-data.csv">fall-29-data.csv</a></td>
+			<td><a href="./data/fall-29-acc.csv">fall-29-acc.csv</a></td>
+			<td><a href=
+				"./data/fall-29-cam0.mp4">cam0</a>
+				<a href="./data/fall-29-cam1.mp4">cam1</a>
+			</td>
+		</tr>
+		<tr>
+			<td>30</td>
+			<td><a href=
+				"./data/fall-30-cam0-d.zip">fall-30-cam0-d.zip</a></td>
+			<td><a href=
+				"./data/fall-30-cam1-d.zip">fall-30-cam1-d.zip</a></td>
+			<td><a href=
+				"./data/fall-30-cam0-rgb.zip">fall-30-cam0-rgb.zip</a></td>
+			<td><a href=
+				"./data/fall-30-cam1-rgb.zip">fall-30-cam1-rgb.zip</a></td>
+			<td><a href=
+				"./data/fall-30-data.csv">fall-30-data.csv</a></td>
+			<td><a href="./data/fall-30-acc.csv">fall-30-acc.csv</a></td>
+			<td><a href=
+				"./data/fall-30-cam0.mp4">cam0</a>
+				<a href="./data/fall-30-cam1.mp4">cam1</a>
+			</td>
+		</tr>
+	</table>
+	</div>
+	<br />
+	<h2> Activities of Daily Living (ADL) sequences: </h2>
+	<div style=" margin-left: auto; margin-right: auto; width:1000px;">
+	<table border="1">
+		<tr>
+			<th rowspan="2">#</th>
+			<th colspan="2">Depth data</th>
+			<th colspan="2">RGB data</th>
+			<th rowspan="2">Synchronization data</th>
+			<th rowspan="2">Accelerometer data</th>
+			<th rowspan="2">&nbsp;&nbsp;&nbsp;&nbsp;Video&nbsp;&nbsp;&nbsp;&nbsp;</th>
+		</tr>
+		<tr style="text-align:center">
+			<th>Camera 0</th>
+			<th style="font-weight:normal">
+				&nbsp;&nbsp;&nbsp;&nbsp;(not available)&nbsp;&nbsp;&nbsp;&nbsp;
+			</th>
+			<th>Camera 0</th>
+			<th style="font-weight:normal;">
+				&nbsp;&nbsp;&nbsp;&nbsp;(not available)&nbsp;&nbsp;&nbsp;&nbsp;
+			</th>
+		</tr>
+		<tr>
+			<td>01</td>
+			<td><a href=
+				"./data/adl-01-cam0-d.zip">adl-01-cam0-d.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-01-cam0-rgb.zip">adl-01-cam0-rgb.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-01-data.csv">adl-01-data.csv</a></td>
+			<td><a href="./data/adl-01-acc.csv">adl-01-acc.csv</a></td>
+			<td><a href="./data/adl-01-cam0.mp4">cam0</a></td>
+		</tr>
+		<tr>
+			<td>02</td>
+			<td><a href=
+				"./data/adl-02-cam0-d.zip">adl-02-cam0-d.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-02-cam0-rgb.zip">adl-02-cam0-rgb.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-02-data.csv">adl-02-data.csv</a></td>
+			<td><a href="./data/adl-02-acc.csv">adl-02-acc.csv</a></td>
+			<td><a href="./data/adl-02-cam0.mp4">cam0</a></td>
+		</tr>
+		<tr>
+			<td>03</td>
+			<td><a href=
+				"./data/adl-03-cam0-d.zip">adl-03-cam0-d.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-03-cam0-rgb.zip">adl-03-cam0-rgb.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-03-data.csv">adl-03-data.csv</a></td>
+			<td><a href="./data/adl-03-acc.csv">adl-03-acc.csv</a></td>
+			<td><a href="./data/adl-03-cam0.mp4">cam0</a></td>
+		</tr>
+		<tr>
+			<td>04</td>
+			<td><a href=
+				"./data/adl-04-cam0-d.zip">adl-04-cam0-d.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-04-cam0-rgb.zip">adl-04-cam0-rgb.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-04-data.csv">adl-04-data.csv</a></td>
+			<td><a href="./data/adl-04-acc.csv">adl-04-acc.csv</a></td>
+			<td><a href="./data/adl-04-cam0.mp4">cam0</a></td>
+		</tr>
+		<tr>
+			<td>05</td>
+			<td><a href=
+				"./data/adl-05-cam0-d.zip">adl-05-cam0-d.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-05-cam0-rgb.zip">adl-05-cam0-rgb.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-05-data.csv">adl-05-data.csv</a></td>
+			<td><a href="./data/adl-05-acc.csv">adl-05-acc.csv</a></td>
+			<td><a href="./data/adl-05-cam0.mp4">cam0</a></td>
+		</tr>
+		<tr>
+			<td>06</td>
+			<td><a href=
+				"./data/adl-06-cam0-d.zip">adl-06-cam0-d.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-06-cam0-rgb.zip">adl-06-cam0-rgb.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-06-data.csv">adl-06-data.csv</a></td>
+			<td><a href="./data/adl-06-acc.csv">adl-06-acc.csv</a></td>
+			<td><a href="./data/adl-06-cam0.mp4">cam0</a></td>
+		</tr>
+		<tr>
+			<td>07</td>
+			<td><a href=
+				"./data/adl-07-cam0-d.zip">adl-07-cam0-d.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-07-cam0-rgb.zip">adl-07-cam0-rgb.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-07-data.csv">adl-07-data.csv</a></td>
+			<td><a href="./data/adl-07-acc.csv">adl-07-acc.csv</a></td>
+			<td><a href="./data/adl-07-cam0.mp4">cam0</a></td>
+		</tr>
+		<tr>
+			<td>08</td>
+			<td><a href=
+				"./data/adl-08-cam0-d.zip">adl-08-cam0-d.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-08-cam0-rgb.zip">adl-08-cam0-rgb.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-08-data.csv">adl-08-data.csv</a></td>
+			<td><a href="./data/adl-08-acc.csv">adl-08-acc.csv</a></td>
+			<td><a href="./data/adl-08-cam0.mp4">cam0</a></td>
+		</tr>
+		<tr>
+			<td>09</td>
+			<td><a href=
+				"./data/adl-09-cam0-d.zip">adl-09-cam0-d.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-09-cam0-rgb.zip">adl-09-cam0-rgb.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-09-data.csv">adl-09-data.csv</a></td>
+			<td><a href="./data/adl-09-acc.csv">adl-09-acc.csv</a></td>
+			<td><a href="./data/adl-09-cam0.mp4">cam0</a></td>
+		</tr>
+		<tr>
+			<td>10</td>
+			<td><a href=
+				"./data/adl-10-cam0-d.zip">adl-10-cam0-d.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-10-cam0-rgb.zip">adl-10-cam0-rgb.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-10-data.csv">adl-10-data.csv</a></td>
+			<td><a href="./data/adl-10-acc.csv">adl-10-acc.csv</a></td>
+			<td><a href="./data/adl-10-cam0.mp4">cam0</a></td>
+		</tr>
+		<tr>
+			<td>11</td>
+			<td><a href=
+				"./data/adl-11-cam0-d.zip">adl-11-cam0-d.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-11-cam0-rgb.zip">adl-11-cam0-rgb.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-11-data.csv">adl-11-data.csv</a></td>
+			<td><a href="./data/adl-11-acc.csv">adl-11-acc.csv</a></td>
+			<td><a href="./data/adl-11-cam0.mp4">cam0</a></td>
+		</tr>
+		<tr>
+			<td>12</td>
+			<td><a href=
+				"./data/adl-12-cam0-d.zip">adl-12-cam0-d.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-12-cam0-rgb.zip">adl-12-cam0-rgb.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-12-data.csv">adl-12-data.csv</a></td>
+			<td><a href="./data/adl-12-acc.csv">adl-12-acc.csv</a></td>
+			<td><a href="./data/adl-12-cam0.mp4">cam0</a></td>
+		</tr>
+		<tr>
+			<td>13</td>
+			<td><a href=
+				"./data/adl-13-cam0-d.zip">adl-13-cam0-d.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-13-cam0-rgb.zip">adl-13-cam0-rgb.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-13-data.csv">adl-13-data.csv</a></td>
+			<td><a href="./data/adl-13-acc.csv">adl-13-acc.csv</a></td>
+			<td><a href="./data/adl-13-cam0.mp4">cam0</a></td>
+		</tr>
+		<tr>
+			<td>14</td>
+			<td><a href=
+				"./data/adl-14-cam0-d.zip">adl-14-cam0-d.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-14-cam0-rgb.zip">adl-14-cam0-rgb.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-14-data.csv">adl-14-data.csv</a></td>
+			<td><a href="./data/adl-14-acc.csv">adl-14-acc.csv</a></td>
+			<td><a href="./data/adl-14-cam0.mp4">cam0</a></td>
+		</tr>
+		<tr>
+			<td>15</td>
+			<td><a href=
+				"./data/adl-15-cam0-d.zip">adl-15-cam0-d.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-15-cam0-rgb.zip">adl-15-cam0-rgb.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-15-data.csv">adl-15-data.csv</a></td>
+			<td><a href="./data/adl-15-acc.csv">adl-15-acc.csv</a></td>
+			<td><a href="./data/adl-15-cam0.mp4">cam0</a></td>
+		</tr>
+		<tr>
+			<td>16</td>
+			<td><a href=
+				"./data/adl-16-cam0-d.zip">adl-16-cam0-d.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-16-cam0-rgb.zip">adl-16-cam0-rgb.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-16-data.csv">adl-16-data.csv</a></td>
+			<td><a href="./data/adl-16-acc.csv">adl-16-acc.csv</a></td>
+			<td><a href="./data/adl-16-cam0.mp4">cam0</a></td>
+		</tr>
+		<tr>
+			<td>17</td>
+			<td><a href=
+				"./data/adl-17-cam0-d.zip">adl-17-cam0-d.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-17-cam0-rgb.zip">adl-17-cam0-rgb.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-17-data.csv">adl-17-data.csv</a></td>
+			<td><a href="./data/adl-17-acc.csv">adl-17-acc.csv</a></td>
+			<td><a href="./data/adl-17-cam0.mp4">cam0</a></td>
+		</tr>
+		<tr>
+			<td>18</td>
+			<td><a href=
+				"./data/adl-18-cam0-d.zip">adl-18-cam0-d.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-18-cam0-rgb.zip">adl-18-cam0-rgb.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-18-data.csv">adl-18-data.csv</a></td>
+			<td><a href="./data/adl-18-acc.csv">adl-18-acc.csv</a></td>
+			<td><a href="./data/adl-18-cam0.mp4">cam0</a></td>
+		</tr>
+		<tr>
+			<td>19</td>
+			<td><a href=
+				"./data/adl-19-cam0-d.zip">adl-19-cam0-d.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-19-cam0-rgb.zip">adl-19-cam0-rgb.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-19-data.csv">adl-19-data.csv</a></td>
+			<td><a href="./data/adl-19-acc.csv">adl-19-acc.csv</a></td>
+			<td><a href="./data/adl-19-cam0.mp4">cam0</a></td>
+		</tr>
+		<tr>
+		<tr>
+			<td>20</td>
+			<td><a href=
+				"./data/adl-20-cam0-d.zip">adl-20-cam0-d.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-20-cam0-rgb.zip">adl-20-cam0-rgb.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-20-data.csv">adl-20-data.csv</a></td>
+			<td><a href="./data/adl-20-acc.csv">adl-20-acc.csv</a></td>
+			<td><a href="./data/adl-20-cam0.mp4">cam0</a></td>
+		</tr>
+		<tr>
+			<td>21</td>
+			<td><a href=
+				"./data/adl-21-cam0-d.zip">adl-21-cam0-d.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-21-cam0-rgb.zip">adl-21-cam0-rgb.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-21-data.csv">adl-21-data.csv</a></td>
+			<td><a href="./data/adl-21-acc.csv">adl-21-acc.csv</a></td>
+			<td><a href="./data/adl-21-cam0.mp4">cam0</a></td>
+		</tr>
+		<tr>
+			<td>22</td>
+			<td><a href=
+				"./data/adl-22-cam0-d.zip">adl-22-cam0-d.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-22-cam0-rgb.zip">adl-22-cam0-rgb.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-22-data.csv">adl-22-data.csv</a></td>
+			<td><a href="./data/adl-22-acc.csv">adl-22-acc.csv</a></td>
+			<td><a href="./data/adl-22-cam0.mp4">cam0</a></td>
+		</tr>
+		<tr>
+			<td>23</td>
+			<td><a href=
+				"./data/adl-23-cam0-d.zip">adl-23-cam0-d.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-23-cam0-rgb.zip">adl-23-cam0-rgb.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-23-data.csv">adl-23-data.csv</a></td>
+			<td><a href="./data/adl-23-acc.csv">adl-23-acc.csv</a></td>
+			<td><a href="./data/adl-23-cam0.mp4">cam0</a></td>
+		</tr>
+		<tr>
+			<td>24</td>
+			<td><a href=
+				"./data/adl-24-cam0-d.zip">adl-24-cam0-d.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-24-cam0-rgb.zip">adl-24-cam0-rgb.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-24-data.csv">adl-24-data.csv</a></td>
+			<td><a href="./data/adl-24-acc.csv">adl-24-acc.csv</a></td>
+			<td><a href="./data/adl-24-cam0.mp4">cam0</a></td>
+		</tr>
+		<tr>
+			<td>25</td>
+			<td><a href=
+				"./data/adl-25-cam0-d.zip">adl-25-cam0-d.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-25-cam0-rgb.zip">adl-25-cam0-rgb.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-25-data.csv">adl-25-data.csv</a></td>
+			<td><a href="./data/adl-25-acc.csv">adl-25-acc.csv</a></td>
+			<td><a href="./data/adl-25-cam0.mp4">cam0</a></td>
+		</tr>
+		<tr>
+			<td>26</td>
+			<td><a href=
+				"./data/adl-26-cam0-d.zip">adl-26-cam0-d.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-26-cam0-rgb.zip">adl-26-cam0-rgb.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-26-data.csv">adl-26-data.csv</a></td>
+			<td><a href="./data/adl-26-acc.csv">adl-26-acc.csv</a></td>
+			<td><a href="./data/adl-26-cam0.mp4">cam0</a></td>
+		</tr>
+		<tr>
+			<td>27</td>
+			<td><a href=
+				"./data/adl-27-cam0-d.zip">adl-27-cam0-d.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-27-cam0-rgb.zip">adl-27-cam0-rgb.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-27-data.csv">adl-27-data.csv</a></td>
+			<td><a href="./data/adl-27-acc.csv">adl-27-acc.csv</a></td>
+			<td><a href="./data/adl-27-cam0.mp4">cam0</a></td>
+		</tr>
+		<tr>
+			<td>28</td>
+			<td><a href=
+				"./data/adl-28-cam0-d.zip">adl-28-cam0-d.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-28-cam0-rgb.zip">adl-28-cam0-rgb.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-28-data.csv">adl-28-data.csv</a></td>
+			<td><a href="./data/adl-28-acc.csv">adl-28-acc.csv</a></td>
+			<td><a href="./data/adl-28-cam0.mp4">cam0</a></td>
+		</tr>
+		<tr>
+			<td>29</td>
+			<td><a href=
+				"./data/adl-29-cam0-d.zip">adl-29-cam0-d.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-29-cam0-rgb.zip">adl-29-cam0-rgb.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-29-data.csv">adl-29-data.csv</a></td>
+			<td><a href="./data/adl-29-acc.csv">adl-29-acc.csv</a></td>
+			<td><a href="./data/adl-29-cam0.mp4">cam0</a></td>
+		</tr>
+		<tr>
+			<td>30</td>
+			<td><a href=
+				"./data/adl-30-cam0-d.zip">adl-30-cam0-d.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-30-cam0-rgb.zip">adl-30-cam0-rgb.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-30-data.csv">adl-30-data.csv</a></td>
+			<td><a href="./data/adl-30-acc.csv">adl-30-acc.csv</a></td>
+			<td><a href="./data/adl-30-cam0.mp4">cam0</a></td>
+		</tr>
+		<tr>
+			<td>31</td>
+			<td><a href=
+				"./data/adl-31-cam0-d.zip">adl-31-cam0-d.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-31-cam0-rgb.zip">adl-31-cam0-rgb.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-31-data.csv">adl-31-data.csv</a></td>
+			<td><a href="./data/adl-31-acc.csv">adl-31-acc.csv</a></td>
+			<td><a href="./data/adl-31-cam0.mp4">cam0</a></td>
+		</tr>
+		<tr>
+			<td>32</td>
+			<td><a href=
+				"./data/adl-32-cam0-d.zip">adl-32-cam0-d.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-32-cam0-rgb.zip">adl-32-cam0-rgb.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-32-data.csv">adl-32-data.csv</a></td>
+			<td><a href="./data/adl-32-acc.csv">adl-32-acc.csv</a></td>
+			<td><a href="./data/adl-32-cam0.mp4">cam0</a></td>
+		</tr>
+		<tr>
+			<td>33</td>
+			<td><a href=
+				"./data/adl-33-cam0-d.zip">adl-33-cam0-d.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-33-cam0-rgb.zip">adl-33-cam0-rgb.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-33-data.csv">adl-33-data.csv</a></td>
+			<td><a href="./data/adl-33-acc.csv">adl-33-acc.csv</a></td>
+			<td><a href="./data/adl-33-cam0.mp4">cam0</a></td>
+		</tr>
+		<tr>
+			<td>34</td>
+			<td><a href=
+				"./data/adl-34-cam0-d.zip">adl-34-cam0-d.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-34-cam0-rgb.zip">adl-34-cam0-rgb.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-34-data.csv">adl-34-data.csv</a></td>
+			<td><a href="./data/adl-34-acc.csv">adl-34-acc.csv</a></td>
+			<td><a href="./data/adl-34-cam0.mp4">cam0</a></td>
+		</tr>
+		<tr>
+			<td>35</td>
+			<td><a href=
+				"./data/adl-35-cam0-d.zip">adl-35-cam0-d.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-35-cam0-rgb.zip">adl-35-cam0-rgb.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-35-data.csv">adl-35-data.csv</a></td>
+			<td><a href="./data/adl-35-acc.csv">adl-35-acc.csv</a></td>
+			<td><a href="./data/adl-35-cam0.mp4">cam0</a></td>
+		</tr>
+		<tr>
+			<td>36</td>
+			<td><a href=
+				"./data/adl-36-cam0-d.zip">adl-36-cam0-d.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-36-cam0-rgb.zip">adl-36-cam0-rgb.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-36-data.csv">adl-36-data.csv</a></td>
+			<td><a href="./data/adl-36-acc.csv">adl-36-acc.csv</a></td>
+			<td><a href="./data/adl-36-cam0.mp4">cam0</a></td>
+		</tr>
+		<tr>
+			<td>37</td>
+			<td><a href=
+				"./data/adl-37-cam0-d.zip">adl-37-cam0-d.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-37-cam0-rgb.zip">adl-37-cam0-rgb.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-37-data.csv">adl-37-data.csv</a></td>
+			<td><a href="./data/adl-37-acc.csv">adl-37-acc.csv</a></td>
+			<td><a href="./data/adl-37-cam0.mp4">cam0</a></td>
+		</tr>
+		<tr>
+			<td>38</td>
+			<td><a href=
+				"./data/adl-38-cam0-d.zip">adl-38-cam0-d.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-38-cam0-rgb.zip">adl-38-cam0-rgb.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-38-data.csv">adl-38-data.csv</a></td>
+			<td><a href="./data/adl-38-acc.csv">adl-38-acc.csv</a></td>
+			<td><a href="./data/adl-38-cam0.mp4">cam0</a></td>
+		</tr>
+		<tr>
+			<td>39</td>
+			<td><a href=
+				"./data/adl-39-cam0-d.zip">adl-39-cam0-d.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-39-cam0-rgb.zip">adl-39-cam0-rgb.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-39-data.csv">adl-39-data.csv</a></td>
+			<td><a href="./data/adl-39-acc.csv">adl-39-acc.csv</a></td>
+			<td><a href="./data/adl-39-cam0.mp4">cam0</a></td>
+		</tr>
+		<tr>
+		<tr>
+			<td>40</td>
+			<td><a href=
+				"./data/adl-40-cam0-d.zip">adl-40-cam0-d.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-40-cam0-rgb.zip">adl-40-cam0-rgb.zip</a></td>
+			<td style="text-align:center">*</td>
+			<td><a href=
+				"./data/adl-40-data.csv">adl-40-data.csv</a></td>
+			<td><a href="./data/adl-40-acc.csv">adl-40-acc.csv</a></td>
+			<td><a href="./data/adl-40-cam0.mp4">cam0</a></td>
+		</tr>
+		<tr>	 
+	</table>
+	</div>
+	<br/>  
+	<br />
+	<br />
+<h2> Extracted features:</h2>
+
+<br />
+	
+<table border="1">
+<tr>
+<td>
+<a href = "./data/urfall-cam0-falls.csv">urfall-cam0-falls.csv</a>
+</td>
+<td>
+<a href = "./data/urfall-cam0-adls.csv">urfall-cam0-adls.csv</a>
+<td>
+</tr>
+</table>
+<br />
+Extracted features from depth maps are stored in CSV format. Each row contains one sample of data corresponding to one depth image. The columns from left to right are organized as follows:
+<ul>
+<li>sequence name - camera name is omitted, because all of the samples are from the front camera ('fall-01-cam0-d' is 'fall-01', 'adl-01-cam0-d' is 'adl-01' and so on), </li>
+<li>frame number - corresponding to number in sequence, </li>
+<li>label - describes human posture in the depth frame; '-1' means person is not lying, '1' means person is lying on the ground; '0' is temporary pose, when person "is falling", we don't use '0' frames in classification,</li>
+<li> HeightWidthRatio - bounding box height to width ratio,</li>
+<li> MajorMinorRatio - major to minor axis ratio, computed from BLOB of segmented person,</li>
+<li> BoundingBoxOccupancy - ratio of how bounding box is occupied by person's pixels, </li>
+<li> MaxStdXZ - standard deviation of pixels from the centroid for the abscissa (X axis) and the depth (Z axis), respectively  (it is computed on segmented person transformed to the 3D point cloud),</li>
+<li> HHmaxRatio - human height in frame to human height while standing ratio,</li>
+<li> H - actual height (in mm),</li>
+<li> D - distance of person center to the floor (in mm),</li>
+<li> P40 - ratio of the number of the point clouds belonging to the cuboid of 40 cm height and placed on the floor to the number of the point clouds belonging to the cuboid of height equal to person's height.</li> 
+
+</ul>
+<br />
+
+
+<br/>
+
+<br/>
+
+<br/>
+</body>
+</html>
+
+

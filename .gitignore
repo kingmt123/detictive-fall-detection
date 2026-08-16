@@ -4,3 +4,5 @@ runs/
 *.onnx
 __pycache__/
 .venv/
+data/omnifall/data_files/
+data/sources/
