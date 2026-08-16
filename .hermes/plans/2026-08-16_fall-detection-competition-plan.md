@@ -37,11 +37,12 @@
 | D. 纯规则（bbox 长宽比+下坠速度） | 传统方法 | ~0 | 中 | 差 | ★★★★★ | 作为后处理组件融入 C |
 
 **推荐：C 为主干 + A 为并行冗余通道 + D 为事件级裁决后处理**。三通道融合输出事件置信度：
-- 通道 A（外观）：YOLOv8n 检测 fallen/person，提供外观置信度；
-- 通道 C（骨架时序）：YOLOv8n-pose（或 RTMPose-tiny）提 17 关键点 → 轻量 TCN/GRU（<1M）做滑窗时序分类；
+- 通道 A（外观）：YOLO11n 检测 fallen/person，提供外观置信度；
+- 通道 C（骨架时序）：YOLO11s-pose（9.9M，主推）或 YOLO11n-pose（2.9M，备选）提 17 关键点 → 轻量 TCN（~0.3M，GRU 作对照）做滑窗（16 帧）时序分类；
 - 通道 D（物理规则）：bbox 长宽比突变、髋部质心垂向速度、身体主轴倾角、倒地后静止时长 → 事件确认/否决。
 
-总参数 ≈ YOLOv8n(3.2M) + pose(3.3M) + TCN(0.5M) ≈ **7M**，可留蒸馏/加码空间；V100 上端到端预计 **20~35ms/帧**，双指标均有加分余量。
+总参数：主推 ≈ YOLO11n(2.6M) + YOLO11s-pose(9.9M) + TCN(0.3M) ≈ **12.8M**；备选（n-pose）≈ **5.8M**。**两个版本都训，按加权得分择优提交**。
+**调研关键结论（docs/research/lightweight_options.md）**：V100 上视觉部分 FP16 仅 2~5ms，时延指标基本"白送"，真正瓶颈在 Python 前后处理；压缩手段优先级 = MGD 特征蒸馏（教师 YOLO11m-pose 自训）> FP16 > RepConv 重参数化 > 剪枝；申报保持 fp32 权重（≤80MB 口径），INT8 默认不用（小目标掉点风险）。
 
 ### 1.4 风险清单
 
@@ -105,7 +106,7 @@
 
 | # | 任务 | 产出 | 验证 |
 |---|---|---|---|
-| D3-1 | 通道 A：YOLOv8n 在跌倒数据上微调（fallen/person 两类） | `runs/detect/baseline/` | val mAP50 报告 |
+| D3-1 | 通道 A：YOLO11n 在跌倒数据上微调（fallen/person 两类） | `runs/detect/baseline/` | val mAP50 报告 |
 | D3-2 | 事件聚合器 v1：置信度滑窗平滑 + 滞回阈值 + 时间轴 NMS | `pipeline/event_aggregator.py` | toy 序列单元测试 |
 | D4-1 | **端到端推理入口** `infer.py`：视频进 → 事件出，输出竞赛格式结果文件 | `infer.py`、`docs/output_format.md` | 基线在本地验证集跑出首版 MAP |
 | D4-2 | 参数量/时延基准跑通 | `reports/baseline_metrics.md` | 参数 ≤20M、时延记录 |
@@ -116,7 +117,7 @@
 
 | # | 任务 | 产出 | 验证 |
 |---|---|---|---|
-| D5-1 | 通道 B：YOLOv8n-pose 微调（若人体检测框由 A 提供则可直接用预训练 pose） | `runs/pose/` | 关键点 PCK/可视化抽查 |
+| D5-1 | 通道 B：YOLO11s-pose 微调（备选 n-pose）（若人体检测框由 A 提供则可直接用预训练 pose） | `runs/pose/` | 关键点 PCK/可视化抽查 |
 | D5-2 | 骨架序列提取器：跟踪（ByteTrack）+ 关键点序列缓存 + 滑窗切片 | `pipeline/pose_track.py` | 序列可视化回放 |
 | D6-1 | 时序分类器：TCN（或 2 层 GRU，<1M）输入 (T,17,3) → fall 概率；训练数据用各数据集骨架化后的片段 | `models/tcn.py`、`runs/temporal/` | 片段级 AUC/F1 报告 |
 | D6-2 | 物理规则引擎 | `pipeline/rules.py` | 单测：坐/弯腰/躺/跌倒样例各 ≥10 条 |
@@ -131,7 +132,7 @@
 |---|---|---|---|
 | D10-1 | 误报分析：导出 FP 片段聚类归因（动作类型/光照/视角），针对性补数据或调规则 | `reports/fp_analysis.md` | FP Top-K 清单 |
 | D10-2 | 阈值-置信度联合调优，锁定 P@R90/P@R95 最佳工作点 | `configs/final.yaml` | MAP 最大化 |
-| D11-1 | 轻量化冲刺：通道剪枝/知识蒸馏（YOLOv8s→n 教师蒸馏）或输入分辨率-精度扫描，把参数压到 8~12M、时延 ≤40ms | `runs/distill/` | 双指标加分测算表 |
+| D11-1 | 轻量化冲刺：通道剪枝/知识蒸馏（YOLO11m-pose→s/n MGD 特征蒸馏）或输入分辨率-精度扫描，把参数压到 8~12M、时延 ≤40ms | `runs/distill/` | 双指标加分测算表 |
 | D11-2 | 红外专项验证：灰度域测试集上的指标单独报告 | `reports/ir_eval.md` | IR 子集 MAP |
 | D12-1 | **冻结算法版本 v1.0**，完整回归测试 + 结果复现脚本 | `Makefile`/`scripts/reproduce.sh` | 一键复现指标 |
 
