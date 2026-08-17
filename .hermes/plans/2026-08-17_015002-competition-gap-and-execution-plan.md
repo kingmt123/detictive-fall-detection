@@ -94,6 +94,10 @@ supersedes_execution_order: 2026-08-16_234916-next-stage-multi-agent-plan.md
 
 分支/worktree：`feat/batch-eval`
 
+状态：**2026-08-17 已完成实现、真实 val 验收与 focused review；无剩余 P0/P1。**
+证据：`reports/urfd_val_r0_metrics.json`；URFD val 14/14、P@R90/P@R95=0.80/0.80、
+本地 clip MAP=80.0%，86 tests；test split 默认拒绝，并有固定持久化 seal 防止成功后重跑。
+
 交付：
 
 - `pipeline/inference_engine.py`：模型只加载一次；`analyze(video, render=False)`；输出稳定 schema；

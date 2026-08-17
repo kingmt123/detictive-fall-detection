@@ -1,0 +1,103 @@
+{
+  "report": "URFD validation rule baseline",
+  "measured_at": "2026-08-17",
+  "base_checkpoint": "efdf799d83b4b338c508416f1b2b93751773188f",
+  "protocol": {
+    "mode": "clip",
+    "status": "local proxy until organizer confirmation",
+    "formula": "MAP = (P@R90 + P@R95) / 2 * 100",
+    "threshold_selection": "validation only"
+  },
+  "inputs": {
+    "dataset": "urfd",
+    "split": "val",
+    "clips": 14,
+    "positive_clips": 8,
+    "negative_clips": 6,
+    "manifest_sha256": "fdea91af1e226a8fda9c863c1484af8a65841ba68d76cda57f2be9bdc45732df",
+    "model": "yolo11n-pose.pt",
+    "model_sha256": "869e83fcdffdc7371fa4e34cd8e51c838cc729571d1635e5141e3075e9319dc0",
+    "image_size": 640,
+    "confidence": 0.1,
+    "device": "RTX 4060 Laptop GPU",
+    "render": false,
+    "visual_frame_after_auto_crop": "320x240"
+  },
+  "completion": {
+    "run_id": "908c8e8c72950ee2",
+    "cache_schema": 2,
+    "evaluation_code_sha256": "442477e74be9a6c262761a389f4d25889472914ceba70629824191f2ce10c26d",
+    "inference_implementation_sha256": "f330e887b673c9559498336b20fd605da3327bee2124d02bd3502fca0e77ac44",
+    "dependency_versions": {
+      "ultralytics": "8.4.120",
+      "torch": "2.13.0+cu126",
+      "numpy": "2.4.3",
+      "opencv-python": "5.0.0.93"
+    },
+    "succeeded": 14,
+    "failed": 0,
+    "resume_verification": "14/14 clips resumed without reinference"
+  },
+  "metrics": {
+    "p_at_r90": 0.8,
+    "p_at_r95": 0.8,
+    "map": 0.8,
+    "map_percent": 80.0,
+    "selected_threshold": 0.1327299550374349,
+    "selected_working_point": {
+      "precision": 0.8,
+      "recall": 1.0,
+      "tp": 8,
+      "fp": 2,
+      "fn": 0,
+      "tn": 4
+    },
+    "false_positive_clips": [
+      {"clip_id": "adl-12-cam0", "score": 0.17692197092992357},
+      {"clip_id": "adl-40-cam0", "score": 0.2553459654027891}
+    ],
+    "false_negative_clips": []
+  },
+  "latency_ms": {
+    "aggregation": "statistics across 14 per-clip frame distributions",
+    "frame_end_to_end_render_false": {
+      "median_clip_mean": 17.530,
+      "median_clip_p50": 16.752,
+      "median_clip_p95": 21.971,
+      "worst_clip_p95": 25.203
+    },
+    "predict": {
+      "median_clip_mean": 16.025,
+      "median_clip_p50": 15.628,
+      "median_clip_p95": 20.139,
+      "worst_clip_p95": 22.530
+    },
+    "decode_crop": {
+      "median_clip_p50": 0.400,
+      "median_clip_p95": 0.664,
+      "worst_clip_p95": 0.813
+    },
+    "cpu_transfer": {
+      "median_clip_p50": 0.205,
+      "median_clip_p95": 1.647,
+      "worst_clip_p95": 2.070
+    },
+    "track_rule": {
+      "median_clip_p50": 0.311,
+      "median_clip_p95": 0.559,
+      "worst_clip_p95": 0.755
+    },
+    "aggregate_per_clip": {
+      "median": 0.175,
+      "worst": 0.451
+    }
+  },
+  "limitations": [
+    "URFD provides clip labels but no event-level ground truth",
+    "14 validation clips are too small for a final competition accuracy claim",
+    "latency excludes rendering and encoding by design",
+    "320x240 cropped URFD measurements are not 1080P results",
+    "measurements are local RTX 4060 results, not organizer V100 results",
+    "test split was not used"
+  ]
+}

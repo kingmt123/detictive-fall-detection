@@ -1,8 +1,8 @@
 # 视觉实时跌倒检测竞赛项目 — AI 交接文档
 
 > **生成时间**: 2026-08-16 18:10  
-> **项目状态**: Round 0 基线加固完成，74 测试全通过，多目标规则 smoke 已实跑  
-> **下一步**: 提交 checkpoint；随后先做可复用推理引擎与 URFD val 批量评测，不直接冒进训练
+> **项目状态**: Round 1 批量评测基础设施完成，86 测试全通过，URFD val 14/14 已实跑
+> **下一步**: 统一普通视频/tar 视频读取并生成可断点 pose cache；仍不直接冒进训练
 
 ---
 
@@ -15,12 +15,13 @@
 | **D1-1** 环境确认 | ✅ 完成 | RTX 4060 Laptop 8GB, CUDA 13.2, Python 3.11, PyTorch 2.13.0+cu126 |
 | **D1-2** 数据盘点 | ✅ 完成 | 3 份调研报告: dataset_survey.md, sota_survey.md, lightweight_options.md |
 | **D1-3** 统一标注格式 | ✅ 完成 | `data/annotations/events.csv` (71,838 合法片段, 17,800 跌倒状态段；过滤 8 个无效区间) |
-| **D2-1** 本地评测数据 | 🟡 数据就绪 | URFD 100 MP4 + OF-Syn 9.7GB 已下载；manifest 12,100 行；完整 val/test 指标尚未运行 |
-| **D2-2** 评测脚本先行 | ✅ 完成 | `eval/metrics.py` (clip/event 双模式, 18 测试); `eval/benchmark.py` |
+| **D2-1** 本地评测数据 | 🟡 val 基线完成 | URFD val 14/14：P@R90=0.80、P@R95=0.80、本地 clip MAP=80.0%；test 未使用，OF-Syn val 待跑 |
+| **D2-2** 评测脚本先行 | ✅ 完成 | `eval/metrics.py`、`eval/evaluate_manifest.py`；显式 split、单模型复用、断点缓存 |
 | **D3-1** 姿态/规则 smoke | 🟡 原型可跑 | YOLO11n-pose 2.874M 参数；属于姿态+规则通道，不是外观通道 A |
 | **D3-2** 事件聚合器 v1 | ✅ 完成 | `pipeline/event_aggregator.py` (16 测试) |
 | **D4-1** 端到端 smoke | 🟡 单样本通过 | 多目标 `infer.py` 实跑 fall-01 检出 track 3 事件 (3.70-3.80s)，adl-01 为 0 事件 |
 | **D4-2** 参数量/微基准 | ✅ 完成 | `reports/benchmark_rtx4060.json`；47.92ms 仅为 YOLO predict 微基准，非端到端时延 |
+| **D4-3** 无渲染批量时延 | 🟡 本机小分辨率 | URFD val 每 clip 帧 P50 中位数 16.75ms、P95 中位数 21.97ms；非 1080P/V100 |
 
 ### 1.2 Round 0 checkpoint 前的 Git 历史 (8 commits)
 
@@ -133,7 +134,7 @@ a7eb66d chore: project skeleton for fall detection competition
 | RTX 4060 P95 时延 | **52.82ms** | 同上 |
 | TCN 参数量 | **0.134M** | 约束 ≤0.5M |
 | TCN CUDA 推理 | **~1.1ms** | 单窗 (16 帧 × 51 维) |
-| 测试总数 | **74** | 全部通过 |
+| 测试总数 | **86** | 全部通过 |
 | URFD fall-01 检出 | **track 3, 3.70-3.80s** | 多目标规则 smoke |
 | URFD adl-01 误报 | **0** | 无事件输出 |
 
@@ -197,7 +198,7 @@ a7eb66d chore: project skeleton for fall detection competition
 - **解决**: `tests/test_tcn.py` 将 `test_latency_budget` 改为 `test_latency_smoke`
   - 只验证推理可执行且时延合理 (0 < dt < 1000ms)
   - 严格阈值测试移到 `eval/benchmark.py` (warm-up 后 P50/P95)
-- **验证**: 74 测试全部通过
+- **验证**: 86 测试全部通过
 
 ---
 
@@ -302,7 +303,7 @@ a7eb66d chore: project skeleton for fall detection competition
 
 - **OF-Syn split**：manifest 未发现 clip/group/path 跨 split，但上游缺少可用 subject/scene ID；只能称为随机 clip split，不能证明身份独立。
 - **多目标跟踪**：当前为轻量 IoU + 常速度中心预测，无外观 ReID；首次交叉、复杂遮挡或长时间离场仍可能产生 ID fragmentation。事件保留 track_id 便于后续错误分析。
-- **行动**：Round 1 在完整 URFD val/test 统计 track 数、切换、漏检和多人失败，再决定是否升级跟踪器。
+- **行动**：Round 1 只在 val 统计 track 数、切换、漏检和多人失败；test 保留到最终冻结后一次运行。
 
 ---
 
@@ -310,27 +311,10 @@ a7eb66d chore: project skeleton for fall detection competition
 
 ### 立即执行
 
-```bash
-# 1. 提交当前改动
-cd /d/HermesWorkspace/Detictive
-git add -A
-git commit -m "feat: establish hardened multi-track fall baseline"
-
-# 2. 验证提交
-git log --oneline -5
-git status --short
-
-# 3. 运行全量测试
-python -m pytest -q
-```
-
-### checkpoint 后开始
-
-```bash
-# Round 1：先批量评测、pose cache、增强纯函数三个 worktree；
-# 不直接启动 TCN 全量训练。
-# 详见 .hermes/plans/2026-08-17_015002-competition-gap-and-execution-plan.md
-```
+1. 实现普通 MP4 与 OF-Syn tar 成员的统一视频源；
+2. 导出关键点、bbox、track ID、timestamp、valid mask 的 `.npz` pose cache；
+3. 先做 10-clip cache smoke 和重跑一致性，再扩展 OF-Syn val；
+4. test split 继续封存，不用于阈值或融合权重选择。
 
 ---
 
@@ -340,7 +324,9 @@ python -m pytest -q
 |---|---|---|
 | `eval/metrics.py` | 评测指标 (clip/event 双模式) | ✅ 已实现 |
 | `eval/benchmark.py` | 模型参数与时延基准 | ✅ 已实现 |
+| `eval/evaluate_manifest.py` | 显式 split 批量评测与断点缓存 | ✅ 已实现 |
 | `infer.py` | 端到端视频推理 | ✅ 已实现 |
+| `pipeline/inference_engine.py` | 单模型复用、无渲染推理、分阶段时延 | ✅ 已实现 |
 | `models/tcn.py` | 0.134M 因果 FallTCN | ✅ 已实现 |
 | `pipeline/pose_track.py` | 多目标姿态轨迹生命周期 | ✅ 已实现 |
 | `pipeline/rules.py` | 姿态物理特征与规则分数 | ✅ 已实现 |
@@ -368,7 +354,8 @@ python -m pytest -q
 
 ## 九、交接检查清单
 
-- [x] 74 测试全部通过
+- [x] 86 测试全部通过
+- [x] URFD val 14/14，P@R90/P@R95=0.80/0.80，test 未使用
 - [x] URFD fall-01 检出 track 3 事件 (3.70-3.80s)
 - [x] URFD adl-01 无误报事件
 - [x] YOLO11n-pose 2.874M 参数 (远低于 20M 约束)

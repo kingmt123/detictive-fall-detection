@@ -3,6 +3,8 @@ runs/
 reports/*.mp4
 reports/*.jpg
 reports/*_debug.json
+reports/*_predictions.jsonl
+reports/*_summary.json
 *.pt
 *.onnx
 __pycache__/
