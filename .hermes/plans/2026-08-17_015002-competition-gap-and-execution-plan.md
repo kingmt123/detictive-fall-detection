@@ -113,24 +113,28 @@ supersedes_execution_order: 2026-08-16_234916-next-stage-multi-agent-plan.md
 - 报告记录阈值来源、硬件、环境和 commit；
 - `render=False` 结果与单视频 wrapper 的 clip score/event 一致。
 
-### Gate 2 — 2026-08-19 至 2026-08-23：统一视频源与 pose cache
+### Gate 2 — 2026-08-17 至 2026-08-22：统一视频源与 pose cache
 
-分支/worktree：`feat/pose-cache`，可与 Gate 1 并行写代码，但 GPU 任务排队运行。
+分支/worktree：`feat/pose-cache`。Gate 1 已合并；GPU 任务继续单队列运行。
+
+详细实施契约：`.hermes/plans/2026-08-17_144818-pose-cache-gate2.md`。
 
 交付：
 
-- `pipeline/video_source.py`：普通 MP4 与 `tar://archive!/member` 统一读取；临时文件生命周期安全；
-- `tools/extract_keypoints.py`：可恢复、原子写入 `.npz`；保存时间戳、17×3 keypoints、bbox、track_id、valid mask、fps、源指纹；
+- `pipeline/video_source.py`：普通 MP4 与 `tar://archive!/member` 统一读取；批次内复用 tar handle；临时文件固定落 D: 且生命周期安全；
+- `pipeline/pose_cache.py`、`pipeline/pose_extractor.py`、`tools/extract_keypoints.py`：可恢复、原子写入并严格校验 `.npz`；保存时间戳、17×3 keypoints、bbox、track_id、valid mask、fps、源/模型/实现签名；
 - cache schema/version 和 manifest 对齐审计；
-- 先 2 个 URFD + 2 个 OF-Syn 小样本 smoke，再扩 val；不立即跑完整 12,000。
+- 先 2 个 URFD + 2 个 OF-Syn val smoke，再做 20-clip 吞吐 canary；不立即跑完整 12,000。
 
 验收：
 
-- tar/普通视频测试；损坏 cache 不会被误当成功；
+- tar/普通视频测试；损坏、陈旧或 shape 非法 cache 不会被误当成功；
 - 相同输入和 seed 生成确定性元数据；
-- 训练代码不允许每个 epoch 重跑 YOLO。
+- smoke 第二次运行 4/4 resume 且 YOLO 零调用；
+- 20-clip 实测决定全量 10,800 train+val 或确定性分层 train 子集 + 完整 1,200 val；
+- 训练代码只读 NPZ，不允许每个 epoch 重跑 YOLO。
 
-### Gate 3 — 2026-08-23 至 2026-08-26：TCN 与长尾增强
+### Gate 3 — 2026-08-22 至 2026-08-25：TCN 与长尾增强
 
 交付：
 
@@ -184,16 +188,16 @@ supersedes_execution_order: 2026-08-16_234916-next-stage-multi-agent-plan.md
 
 ## 6. 立即执行的下一小步
 
-checkpoint 后只启动 `feat/batch-eval`：
+从干净 `master@bd84fbc` 创建 `feat/pose-cache` worktree，严格按 TDD 完成：
 
-1. 先写 fake-model 测试，要求模型只构造一次；
-2. 从 `infer.py` 提取可复用 engine，并支持 `render=False`；
-3. 保留原单视频 CLI 作为兼容 wrapper；
-4. 在 fall-01/adl-01 做等价回归；
-5. 再实现 manifest 批处理与 resume；
-6. 只跑 URFD val，不跑 test。
+1. `pipeline/video_source.py`：先测本地路径、Windows tar URI、缺失成员、临时文件异常清理和 tar handle 复用；
+2. `pipeline/pose_cache.py`：先测 schema v1 round-trip、损坏/陈旧拒绝和原子替换；
+3. `pipeline/pose_extractor.py`：fake model 验证变人数 `[T,P,...]`、时间戳、模型单实例和每 clip tracker 重置；
+4. `tools/extract_keypoints.py`：manifest 前置校验、显式 dataset/split、test 拒绝、cache-first resume；
+5. 只跑 val 的 `fall-18-cam0`、`adl-02-cam0`、`fall/fall_ch_026`、`fall/fall_ch_085`；
+6. 4/4 首跑与 4/4 零推理 resume 通过后，再运行 20-clip canary。
 
-这一步完成前，不启动完整 OF-Syn cache、TCN 训练、第二 YOLO、蒸馏、剪枝或量化。
+这一步完成前，不启动完整 OF-Syn cache、TCN 训练、第二 YOLO、蒸馏、剪枝或量化。TCN 启动的必要条件是确定性 train cache、完整 val cache、schema 审计和零 YOLO resume 同时成立。
 
 ## 7. 风险登记
 
@@ -206,6 +210,8 @@ checkpoint 后只启动 `feat/batch-eval`：
 | PyTorch 依赖/权重下载导致隐藏环境失败 | 非公开测试不可运行 | 锁定环境、离线权重、启动自检、清晰失败信息 |
 | 当前无 Git remote | checkpoint 无异地备份 | checkpoint 后配置私有远程或离线压缩备份 |
 | 提交材料包含原始研究抓取中的第三方单位信息 | 匿名审查歧义/包过大 | 最终 ZIP 使用白名单，不包含 `docs/research/_raw` |
+| C: 仅余约 5.8GB，tar 临时解包可能耗尽系统盘 | 抽取中断或系统异常 | 临时文件强制写入 D: worktree `runs/tmp`；逐 clip `finally` 清理 |
+| TCN 只有 val cache、没有 train cache | 无法训练或每 epoch 重跑 YOLO | 20-clip 外推后生成确定性 train cache（全量或冻结子集）与完整 val cache |
 
 ## 8. 完成定义
 
