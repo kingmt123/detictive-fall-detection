@@ -147,16 +147,35 @@ class VideoSourceResolver:
             if not path.is_file():
                 raise ValueError(f"本地视频不存在: {path}")
             stat = path.stat()
-            yield MaterializedVideo(
-                path,
-                {
-                    "kind": "local",
-                    "path": str(path),
-                    "size": stat.st_size,
-                    "mtime_ns": stat.st_mtime_ns,
-                },
-                _sha256(path),
-            )
+            self.temp_root.mkdir(parents=True, exist_ok=True)
+            temporary_path: Path | None = None
+            digest = hashlib.sha256()
+            try:
+                with (
+                    path.open("rb") as source_handle,
+                    tempfile.NamedTemporaryFile(
+                        dir=self.temp_root,
+                        suffix=path.suffix or ".video",
+                        delete=False,
+                    ) as target,
+                ):
+                    temporary_path = Path(target.name)
+                    for chunk in iter(lambda: source_handle.read(1024 * 1024), b""):
+                        target.write(chunk)
+                        digest.update(chunk)
+                yield MaterializedVideo(
+                    temporary_path,
+                    {
+                        "kind": "local",
+                        "path": str(path),
+                        "size": stat.st_size,
+                        "mtime_ns": stat.st_mtime_ns,
+                    },
+                    digest.hexdigest(),
+                )
+            finally:
+                if temporary_path is not None:
+                    temporary_path.unlink(missing_ok=True)
             return
 
         archive_path = parsed.archive_path.resolve()

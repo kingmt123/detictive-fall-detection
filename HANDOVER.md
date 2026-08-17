@@ -3,8 +3,8 @@
 > **更新时间**：2026-08-17
 > **当前分支**：`feat/pose-cache`（worktree：`D:\HermesWorkspace\Detictive-wt-pose-cache`）
 > **基线分支**：`master` @ `1624ec0`
-> **状态**：Gate 1 已合并；Gate 2 的统一视频源、原子 pose cache、cache-first CLI 和 4-clip 实跑已完成，等待 focused review 后合并
-> **下一门**：20-clip val canary；未通过前不跑 1,200 OF-Syn val、不训练 TCN、不读取 test
+> **状态**：Gate 1 已合并；Gate 2 的 4 个 review P1、118 tests 和最终 4/4 rebuild→resume 均通过，仅等待 closure review
+> **下一门**：closure review PASS 后合并 Gate 2A；再补 evaluator/InferenceEngine tar-source tracer并做 20-clip val canary；不读取 test
 
 ## 1. 当前事实
 
@@ -13,11 +13,11 @@
 | URFD val 规则基线 | 14/14 完成 | P@R90=0.80、P@R95=0.80、本地 clip MAP=80.0% |
 | Test split | 未使用 | 批量评测有持久化 one-shot seal；pose cache 阶段直接拒绝 test |
 | 普通 MP4 | 支持 | `pipeline/video_source.py` |
-| OF-Syn tar URI | 支持 | 严格 `tar://archive!/member`，批次内复用 tar handle |
+| OF-Syn tar URI | Pose cache 路径支持 | 严格 `tar://archive!/member`，批次内复用 tar handle；rule evaluator 尚待接入 |
 | Pose cache | 支持 | 原子 NPZ、严格 dtype/shape、源内容 SHA、提取签名 |
 | Cache-first 提取 | 支持 | `tools/extract_keypoints.py`，单模型复用、显式 dataset/split |
 | 真实 smoke | 4/4 完成 | 2 URFD val + 2 OF-Syn val；重跑 4/4 resume |
-| 自动化测试 | 114 passed | `python -m pytest -q` |
+| 自动化测试 | 118 passed | `python -m pytest -q` |
 | FallTCN | 仅结构/单测 | 尚无正式 train cache、checkpoint、真实指标 |
 
 ## 2. Gate 2 实现
@@ -26,7 +26,7 @@
 
 `pipeline/video_source.py`：
 
-- 本地 MP4 直接使用原路径；
+- cache miss 时本地 MP4 复制到显式 D: temp root 的不可变快照，hash 与 decoder 消费同一份字节；
 - tar 成员流式写入调用方指定的 D: 临时目录；
 - 一个 `VideoSourceResolver` 在整个批次复用 tar 索引/handle；
 - 正常退出和异常退出都删除临时视频；
@@ -55,6 +55,7 @@
 `PoseExtractor.cache_signature()` 绑定：
 
 - 模型权重 SHA-256；
+- 签名和懒加载构造器消费同一个不可变权重快照；
 - `pose_extractor.py`、`pose_track.py` 和实际裁剪实现源码；
 - NumPy/OpenCV/PyTorch/Ultralytics 版本；
 - device、image size、confidence、crop；
@@ -116,6 +117,7 @@ Feature 分支提交：
 76f5ef0 feat: add atomic validated pose cache schema
 8e4539f feat: extract resumable pose caches from manifest
 a860a2d feat: harden pose cache resume telemetry
+bc3ad28 fix: enforce deterministic pose track rows
 ```
 
 计划 checkpoint 已在 master：
@@ -135,13 +137,14 @@ a860a2d feat: harden pose cache resume telemetry
 
 执行顺序：
 
-1. focused review；修复所有 P0/P1 并复审；
-2. 从 val 确定性选择 20 clips，覆盖 URFD/OF-Syn、正负样本和 hard negatives；
-3. 记录每 clip：源读取/解包时间、YOLO+tracking 时间、总时间、NPZ 大小、T/P/有效 observation、失败类型；
-4. 立即重跑，必须 20/20 resume 且零 YOLO；
-5. 根据实测吞吐外推 1,200 val 和 train cache 成本；
-6. 只有 canary 无 schema/恢复问题后才冻结配置并扩容；
-7. 只有正式 train/val cache 覆盖率和反向审计通过后才实现 TCN dataset/training。
+1. 固定当前 HEAD，完成 4 个 P1 的 closure review 后合并 Gate 2A；
+2. TDD 接入 `evaluate_manifest -> InferenceEngine -> VideoSourceResolver` 的 tar URI，规则/event 逻辑不变；
+3. 从 val 确定性选择 20 clips，覆盖 URFD/OF-Syn、正负样本和 hard negatives；
+4. 记录每 clip：源读取/解包时间、YOLO+tracking 时间、总时间、NPZ 大小、T/P/有效 observation、失败类型；
+5. 立即重跑，必须 20/20 resume 且零 YOLO；
+6. 根据实测吞吐外推 1,200 val 和 train cache 成本；
+7. 只有 canary 无 schema/恢复问题后才冻结配置并扩容；
+8. 只有正式 train/val cache 覆盖率和反向审计通过后才启动 TCN pilot。
 
 ## 7. 禁止事项
 
@@ -157,6 +160,7 @@ a860a2d feat: harden pose cache resume telemetry
 ## 8. 当前已知限制
 
 - OF-Syn 完整 1,200 val 尚未缓存/评测；
+- `eval/evaluate_manifest.py` / `InferenceEngine.analyze()` 尚未通过共享 resolver 消费 tar URI；
 - 还没有 20-clip 吞吐和 cache 容量外推；
 - dense `[T,P,...]` schema 已 smoke，但 TCN dataset consumer 尚未实现；
 - 多目标 tracker 无 ReID，复杂遮挡/交叉可能产生 ID 碎片；

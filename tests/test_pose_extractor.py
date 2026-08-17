@@ -3,6 +3,7 @@ import hashlib
 from pathlib import Path
 
 import numpy as np
+import pytest
 
 from pipeline.pose_extractor import PoseExtractor
 
@@ -167,4 +168,69 @@ def test_extractor_signature_binds_model_bytes_code_and_behavior_config(tmp_path
     assert signature["max_frames"] == 30
 
     model_path.write_bytes(b"model-v2")
-    assert extractor.cache_signature(crop="auto", max_frames=30) != signature
+    assert extractor.cache_signature(crop="auto", max_frames=30) == signature
+    replacement = PoseExtractor(
+        model_path=model_path,
+        model_factory=lambda _path: _FakeModel(),
+    )
+    assert replacement.cache_signature(crop="auto", max_frames=30) != signature
+    extractor.close()
+    replacement.close()
+
+
+def test_extractor_rejects_decode_shorter_than_reported_frame_count(tmp_path: Path):
+    class _TruncatedCapture(_FakeCapture):
+        def get(self, property_id):
+            if property_id == 7:
+                return 2
+            return super().get(property_id)
+
+        def read(self):
+            if self.index == 1:
+                return False, None
+            return super().read()
+
+    capture = _TruncatedCapture()
+    extractor = PoseExtractor(
+        model_path=tmp_path / "fake.pt",
+        model_factory=lambda _path: _FakeModel(),
+        capture_factory=lambda _path: capture,
+    )
+
+    with pytest.raises(ValueError, match="帧数|截断"):
+        extractor.extract(tmp_path / "clip.mp4")
+
+    assert capture.released
+
+
+def test_signature_and_lazy_model_use_the_same_immutable_weight_snapshot(
+    tmp_path: Path,
+):
+    model_path = tmp_path / "model.pt"
+    model_path.write_bytes(b"model-A")
+    loaded_bytes: list[bytes] = []
+    loaded_paths: list[Path] = []
+    snapshot_root = tmp_path / "snapshots"
+
+    def model_factory(path: str):
+        loaded_paths.append(Path(path))
+        loaded_bytes.append(Path(path).read_bytes())
+        return _FakeModel()
+
+    extractor = PoseExtractor(
+        model_path=model_path,
+        model_factory=model_factory,
+        capture_factory=lambda _path: _FakeCapture(),
+        model_snapshot_root=snapshot_root,
+    )
+    signature = extractor.cache_signature(crop="auto")
+    model_path.write_bytes(b"model-B")
+
+    extractor.extract(tmp_path / "clip.mp4")
+
+    assert signature["model_sha256"] == hashlib.sha256(b"model-A").hexdigest()
+    assert loaded_bytes == [b"model-A"]
+    assert loaded_paths[0].exists()
+    extractor.close()
+    assert not loaded_paths[0].exists()
+    assert not list(snapshot_root.iterdir())

@@ -176,6 +176,20 @@ def test_loader_rejects_truncated_npz(tmp_path: Path):
         )
 
 
+def test_loader_normalizes_truncated_zip_directory_to_value_error(tmp_path: Path):
+    record = _zero_person_record()
+    path = tmp_path / "truncated-directory.npz"
+    write_pose_cache(path, record)
+    path.write_bytes(path.read_bytes()[:-22])
+
+    with pytest.raises(ValueError, match="损坏"):
+        load_pose_cache(
+            path,
+            expected_source_identity=record.source_identity,
+            expected_extractor_signature=record.extractor_signature,
+        )
+
+
 def test_failed_temp_write_preserves_existing_cache(monkeypatch, tmp_path: Path):
     import pipeline.pose_cache as module
 

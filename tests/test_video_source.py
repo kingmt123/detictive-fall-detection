@@ -96,6 +96,21 @@ def test_materialized_tar_member_is_cleaned_when_consumer_raises(tmp_path: Path)
     assert not materialized_path.exists()
 
 
+def test_materialized_local_source_is_an_immutable_snapshot(tmp_path: Path):
+    source = tmp_path / "clip.mp4"
+    source.write_bytes(b"video-A")
+    temp_root = tmp_path / "materialized"
+
+    with VideoSourceResolver(temp_root) as resolver:
+        with resolver.materialize(source) as video:
+            materialized_path = video.local_path
+            source.write_bytes(b"video-B")
+            assert materialized_path != source
+            assert materialized_path.read_bytes() == b"video-A"
+            assert video.content_sha256 == hashlib.sha256(b"video-A").hexdigest()
+        assert not materialized_path.exists()
+
+
 def test_probe_rejects_missing_tar_member(tmp_path: Path):
     archive = tmp_path / "videos.tar"
     with tarfile.open(archive, "w"):

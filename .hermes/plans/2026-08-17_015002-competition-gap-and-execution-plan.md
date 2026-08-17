@@ -18,10 +18,12 @@ supersedes_execution_order: 2026-08-16_234916-next-stage-multi-agent-plan.md
 
 1. Round 0 checkpoint；
 2. 可复用推理引擎 + URFD val 批量评测；
-3. 普通 MP4/OF-Syn tar 统一视频源 + pose cache；
-4. TCN 训练与 val 调参；
-5. 规则/TCN/融合消融与一次性 test；
-6. 1080P 端到端时延、V100 复测与提交材料。
+3. 普通 MP4/OF-Syn tar 统一视频源 + pose cache smoke；
+4. tar evaluator tracer + 20-clip canary + 确定性 train cache/完整 val cache；
+5. TCN 训练与 val 调参、规则/TCN/融合消融；
+6. 候选冻结后的 1080P/V100 pre-seal 硬门；
+7. 只消费 OF-Syn 一次性 test；
+8. 只完善提交材料，不再改算法。
 
 ## 1. 权威要求与当前证据矩阵
 
@@ -48,7 +50,7 @@ supersedes_execution_order: 2026-08-16_234916-next-stage-multi-agent-plan.md
 
 ### 2.1 已经可信的部分
 
-- 74 个单元测试覆盖指标、数据语义、因果聚合、unknown、时间归一、多目标跟踪、TCN 因果性和 1080P 预处理。
+- 自动化测试覆盖指标、数据语义、因果聚合、unknown、时间归一、多目标跟踪、TCN 因果性、统一视频源和原子 pose cache；准确数量以当前 HEAD 的 `pytest` 输出为准。
 - `data/manifest.csv` 实际生成 12,100 行：OF-Syn 12,000、URFD 100。
 - OF-Syn 12,000 个 `tar://...!/./...` 成员均可在 9.7GB 归档中命中；非法事件数为 0。
 - fall-01 smoke 输出 track 3、3.70–3.80s；adl-01 输出 0 事件。
@@ -56,7 +58,7 @@ supersedes_execution_order: 2026-08-16_234916-next-stage-multi-agent-plan.md
 
 ### 2.2 不能宣称完成的部分
 
-- 73 tests 不是竞赛准确率。
+- 自动化测试通过不是竞赛准确率。
 - fall-01/adl-01 不是完整公开验证集。
 - 47.92ms 是 `model.predict()` 微基准，不是单帧端到端耗时。
 - TCN 只有随机初始化网络结构，没有 cache、训练 checkpoint 或 val 指标。
@@ -125,6 +127,7 @@ supersedes_execution_order: 2026-08-16_234916-next-stage-multi-agent-plan.md
 - `pipeline/pose_cache.py`、`pipeline/pose_extractor.py`、`tools/extract_keypoints.py`：可恢复、原子写入并严格校验 `.npz`；保存时间戳、17×3 keypoints、bbox、track_id、valid mask、fps、源/模型/实现签名；
 - cache schema/version 和 manifest 对齐审计；
 - 先 2 个 URFD + 2 个 OF-Syn val smoke，再做 20-clip 吞吐 canary；不立即跑完整 12,000。
+- canary 前用一个 TDD tracer 把 OF-Syn tar URI 接入现有 `evaluate_manifest/InferenceEngine`，不能让统一 resolver 只服务 extractor。
 
 验收：
 
@@ -135,6 +138,8 @@ supersedes_execution_order: 2026-08-16_234916-next-stage-multi-agent-plan.md
 - 训练代码只读 NPZ，不允许每个 epoch 重跑 YOLO。
 
 ### Gate 3 — 2026-08-22 至 2026-08-25：TCN 与长尾增强
+
+启动候选训练前必须具备：确定性 train cache、完整 val cache、覆盖/反向审计报告、固定 manifest/config/code 哈希，以及重跑零 YOLO 的证据。Dataset/训练代码可以在四样本闭环后开发，但 pilot 不得绕过这些数据门。
 
 交付：
 
@@ -150,14 +155,15 @@ supersedes_execution_order: 2026-08-16_234916-next-stage-multi-agent-plan.md
 - 若红外增强损害正常域且 IR-like slice 无提升，回退增强强度；
 - 不在此阶段加入第二外观 YOLO。
 
-### Gate 4 — 2026-08-26 至 2026-08-28：冻结候选与一次性 test
+### Gate 4A — 2026-08-25 至 2026-08-27：冻结候选与 pre-seal 硬门
 
 交付：
 
 - 冻结所有阈值、权重、窗口和后处理；
-- 在 test 上只运行一次；
-- 输出 clip/event（若GT可用）指标、FP/FN、多人/遮挡/低光切片；
-- 比较总参数、FP32体积、权重文件体积和完整端到端时延。
+- 在 val 上冻结唯一 commit/tag、阈值、权重、窗口和后处理；
+- 完成 1080P、`render=False`、V100 端到端 P50/P95，确认 P95 ≤100ms；
+- 比较总参数、FP32 体积、权重文件体积；
+- 干净环境运行批量入口和提交 ZIP dry-run；test 仍保持封存。
 
 只有以下证据之一成立才开启外观通道实验：
 
@@ -166,10 +172,15 @@ supersedes_execution_order: 2026-08-16_234916-next-stage-multi-agent-plan.md
 3. V100 P95 与参数预算仍有明确余量；
 4. 有独立 val 证明收益，不用 test 选方案。
 
-### Gate 5 — 2026-08-28 至 2026-08-31：性能与提交材料
+### Gate 4B — 2026-08-28：OF-Syn 一次性 test seal
 
-- 1080P 视频、`render=False` 端到端 P50/P95；V100 环境复测；
-- 明确区分单帧计算时延、在线确认延迟和离线编码耗时；
+- 仅当 Gate 4A 全部通过、唯一候选冻结且 reviewer 批准时，消费 OF-Syn test 1,200；
+- URFD 是辅助外部数据，其 test 保持封存，避免项目级单 seal 的多数据集歧义；
+- test 后不再调阈值、模型、融合或性能配置；FP/FN 只用于报告局限。
+
+### Gate 5 — 2026-08-28 至 2026-08-31：提交材料
+
+- 引用 Gate 4A 已冻结的性能证据，明确区分单帧计算时延、在线确认延迟和离线编码耗时；
 - 300字内简介 PDF；
 - 项目文档 PDF：设计、数据、来源、引用、指标、消融、局限、部署；
 - 3–4 分钟 MP4，≤200MB；
@@ -184,7 +195,7 @@ supersedes_execution_order: 2026-08-16_234916-next-stage-multi-agent-plan.md
 - Agent B：视频源抽象、tar 读取、pose cache schema。
 - Agent C：红外/低光/遮挡增强，只写代码和小样本审计；不得与 A/B 同时跑大 GPU 批任务。
 - Reviewer：每个 worktree 合并前只读 focused review，先 P0/P1，再全量测试。
-- GPU 队列顺序：URFD val 基线 → pose cache smoke → pose cache val → TCN train → 最终 benchmark。
+- GPU 队列顺序：URFD val 基线 → pose cache smoke → 20-clip canary → train pilot/预算 → 确定性 train cache + 完整 val cache → TCN train → 1080P/V100 pre-seal → OF-Syn test seal。
 
 ## 6. 立即执行的下一小步
 
@@ -195,7 +206,7 @@ supersedes_execution_order: 2026-08-16_234916-next-stage-multi-agent-plan.md
 3. `pipeline/pose_extractor.py`：fake model 验证变人数 `[T,P,...]`、时间戳、模型单实例和每 clip tracker 重置；
 4. `tools/extract_keypoints.py`：manifest 前置校验、显式 dataset/split、test 拒绝、cache-first resume；
 5. 只跑 val 的 `fall-18-cam0`、`adl-02-cam0`、`fall/fall_ch_026`、`fall/fall_ch_085`；
-6. 4/4 首跑与 4/4 零推理 resume 通过后，再运行 20-clip canary。
+6. 4/4 首跑与 4/4 零推理 resume、focused review closure 通过后，先补 evaluator tar tracer，再运行 20-clip canary。
 
 这一步完成前，不启动完整 OF-Syn cache、TCN 训练、第二 YOLO、蒸馏、剪枝或量化。TCN 启动的必要条件是确定性 train cache、完整 val cache、schema 审计和零 YOLO resume 同时成立。
 

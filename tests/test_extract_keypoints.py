@@ -201,7 +201,7 @@ def test_partial_failure_keeps_successful_cache_and_returns_nonzero_summary(
 
     class FailingExtractor(_FakeExtractor):
         def extract(self, source: Path, *, crop: str, max_frames: int | None):
-            if Path(source).name == "bad.mp4":
+            if Path(source).read_bytes() == b"bad":
                 raise RuntimeError("synthetic failure")
             return super().extract(source, crop=crop, max_frames=max_frames)
 

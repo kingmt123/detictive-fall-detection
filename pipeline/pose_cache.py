@@ -6,6 +6,7 @@ import json
 import os
 import re
 import tempfile
+import zipfile
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
@@ -180,7 +181,7 @@ def load_pose_cache(
             )
             _validate_record(record)
             return record
-    except (OSError, KeyError, TypeError, json.JSONDecodeError) as exc:
+    except (OSError, KeyError, TypeError, json.JSONDecodeError, zipfile.BadZipFile) as exc:
         raise ValueError(f"pose cache 损坏或字段不完整: {path}") from exc
 
 

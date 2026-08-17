@@ -307,23 +307,27 @@ def main() -> None:
         device=args.device,
         image_size=args.image_size,
         confidence=args.confidence,
+        model_snapshot_root=args.temp_root,
     )
     try:
-        summary = extract_manifest(
-            args.manifest,
-            extractor=extractor,
-            dataset=args.dataset,
-            split=args.split,
-            cache_root=args.cache_root,
-            temp_root=args.temp_root,
-            crop=args.crop,
-            max_frames=args.max_frames,
-            clip_ids=set(args.clip_ids) if args.clip_ids else None,
-            limit=args.limit,
-        )
-    except PoseExtractionBatchError as exc:
-        print(json.dumps(exc.summary, ensure_ascii=False))
-        raise SystemExit(1) from exc
+        try:
+            summary = extract_manifest(
+                args.manifest,
+                extractor=extractor,
+                dataset=args.dataset,
+                split=args.split,
+                cache_root=args.cache_root,
+                temp_root=args.temp_root,
+                crop=args.crop,
+                max_frames=args.max_frames,
+                clip_ids=set(args.clip_ids) if args.clip_ids else None,
+                limit=args.limit,
+            )
+        except PoseExtractionBatchError as exc:
+            print(json.dumps(exc.summary, ensure_ascii=False))
+            raise SystemExit(1) from exc
+    finally:
+        extractor.close()
     print(json.dumps(summary, ensure_ascii=False))
 
 

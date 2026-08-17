@@ -2,6 +2,8 @@
 from __future__ import annotations
 
 import hashlib
+import os
+import tempfile
 from collections.abc import Callable
 from dataclasses import dataclass
 from importlib.metadata import PackageNotFoundError, version
@@ -17,14 +19,6 @@ from pipeline.pose_cache import CACHE_SCHEMA
 from pipeline.pose_track import MultiPoseTracker, TrackedPose
 
 POSE_EXTRACTION_PROTOCOL = "pose_extraction_v1"
-
-
-def _sha256_file(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for chunk in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(chunk)
-    return digest.hexdigest()
 
 
 def _implementation_sha256() -> str:
@@ -67,6 +61,7 @@ class PoseExtractor:
         confidence: float = 0.10,
         model_factory: Callable[[str], Any] = YOLO,
         capture_factory: Callable[[str], Any] = cv2.VideoCapture,
+        model_snapshot_root: Path | None = None,
     ) -> None:
         self.model_path = str(model_path)
         self.device = device
@@ -74,23 +69,64 @@ class PoseExtractor:
         self.confidence = confidence
         self._model_factory = model_factory
         self._model: Any | None = None
+        self.model_snapshot_root = model_snapshot_root
+        self._model_snapshot_dir: Any | None = None
+        self._model_snapshot_path: Path | None = None
+        self._model_sha256: str | None = None
         self.capture_factory = capture_factory
 
     def _get_model(self) -> Any:
         if self._model is None:
-            self._model = self._model_factory(self.model_path)
+            model_path = self._model_snapshot_path or Path(self.model_path)
+            self._model = self._model_factory(str(model_path))
         return self._model
+
+    def _freeze_model_snapshot(self) -> tuple[Path, str]:
+        if self._model_snapshot_path is not None and self._model_sha256 is not None:
+            return self._model_snapshot_path, self._model_sha256
+        source = Path(self.model_path)
+        if not source.is_file():
+            raise ValueError(f"模型权重不存在，无法生成 cache 签名: {source}")
+        snapshot_root = self.model_snapshot_root
+        if snapshot_root is not None:
+            snapshot_root.mkdir(parents=True, exist_ok=True)
+        snapshot_dir = tempfile.TemporaryDirectory(
+            prefix="pose-model-",
+            dir=snapshot_root,
+        )
+        snapshot_path = Path(snapshot_dir.name) / source.name
+        digest = hashlib.sha256()
+        try:
+            with source.open("rb") as source_handle, snapshot_path.open("wb") as target:
+                for chunk in iter(lambda: source_handle.read(1024 * 1024), b""):
+                    target.write(chunk)
+                    digest.update(chunk)
+                target.flush()
+                os.fsync(target.fileno())
+        except Exception:
+            snapshot_dir.cleanup()
+            raise
+        self._model_snapshot_dir = snapshot_dir
+        self._model_snapshot_path = snapshot_path
+        self._model_sha256 = digest.hexdigest()
+        return snapshot_path, self._model_sha256
+
+    def close(self) -> None:
+        self._model = None
+        if self._model_snapshot_dir is not None:
+            self._model_snapshot_dir.cleanup()
+        self._model_snapshot_dir = None
+        self._model_snapshot_path = None
+        self._model_sha256 = None
 
     def cache_signature(
         self, *, crop: CropMode, max_frames: int | None = None
     ) -> dict[str, Any]:
-        model_path = Path(self.model_path)
-        if not model_path.is_file():
-            raise ValueError(f"模型权重不存在，无法生成 cache 签名: {model_path}")
+        _, model_sha256 = self._freeze_model_snapshot()
         return {
             "protocol": POSE_EXTRACTION_PROTOCOL,
             "cache_schema": CACHE_SCHEMA,
-            "model_sha256": _sha256_file(model_path),
+            "model_sha256": model_sha256,
             "implementation_sha256": _implementation_sha256(),
             "device": self.device,
             "image_size": self.image_size,
@@ -115,6 +151,7 @@ class PoseExtractor:
             capture.release()
             raise ValueError(f"无法打开视频: {source}")
         fps = sanitize_fps(capture.get(cv2.CAP_PROP_FPS))
+        reported_frame_count = max(0, int(capture.get(cv2.CAP_PROP_FRAME_COUNT)))
         model = self._get_model()
         tracker = MultiPoseTracker(max_misses=max(3, round(fps * 0.4)))
         observations: list[list[TrackedPose]] = []
@@ -157,6 +194,14 @@ class PoseExtractor:
         if not observations or frame_size is None:
             raise ValueError(f"视频没有可读帧: {source}")
         frame_count = len(observations)
+        expected_frame_count = reported_frame_count
+        if max_frames is not None:
+            expected_frame_count = min(expected_frame_count, max_frames)
+        if reported_frame_count > 0 and frame_count < expected_frame_count:
+            raise ValueError(
+                f"视频解码帧数少于容器报告值，拒绝发布截断 cache: "
+                f"decoded={frame_count}, expected={expected_frame_count}"
+            )
         max_people = max(map(len, observations))
         keypoints_out = np.zeros(
             (frame_count, max_people, 17, 3), dtype=np.float32
