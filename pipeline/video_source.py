@@ -112,6 +112,33 @@ class VideoSourceResolver:
             "member_offset": info.offset_data,
         }
 
+    def content_sha256(self, source: str | Path) -> str:
+        """流式计算源内容 SHA-256；tar 成员不写临时文件。"""
+        parsed = parse_video_source(source)
+        if isinstance(parsed, LocalSource):
+            path = parsed.path.resolve()
+            if not path.is_file():
+                raise ValueError(f"本地视频不存在: {path}")
+            return _sha256(path)
+
+        archive = self._open_archive(parsed.archive_path.resolve())
+        try:
+            info = archive.getmember(parsed.member)
+        except KeyError as exc:
+            raise ValueError(f"tar 成员不存在: {parsed.member}") from exc
+        if not info.isfile():
+            raise ValueError(f"tar 成员不是普通文件: {parsed.member}")
+        source_handle = archive.extractfile(info)
+        if source_handle is None:
+            raise ValueError(f"无法读取 tar 成员: {parsed.member}")
+        digest = hashlib.sha256()
+        try:
+            for chunk in iter(lambda: source_handle.read(1024 * 1024), b""):
+                digest.update(chunk)
+        finally:
+            source_handle.close()
+        return digest.hexdigest()
+
     @contextmanager
     def materialize(self, source: str | Path) -> Iterator[MaterializedVideo]:
         parsed = parse_video_source(source)
