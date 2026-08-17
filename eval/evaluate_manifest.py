@@ -310,13 +310,8 @@ def evaluate_manifest(
             clip_id = row["clip_id"]
             if clip_id in successful:
                 continue
-            source = _resolve_video_source(row["video_path"], manifest_path)
-            source_kind = (
-                "local"
-                if isinstance(parse_video_source(source), LocalSource)
-                else "tar"
-            )
             source_prepare_seconds: float | None = None
+            source_kind = "unknown"
             base_record = {
                 "run_id": run_id,
                 "dataset": dataset,
@@ -327,6 +322,13 @@ def evaluate_manifest(
                 "source_kind": source_kind,
             }
             try:
+                source = _resolve_video_source(row["video_path"], manifest_path)
+                source_kind = (
+                    "local"
+                    if isinstance(parse_video_source(source), LocalSource)
+                    else "tar"
+                )
+                base_record["source_kind"] = source_kind
                 prepare_started = time.perf_counter()
                 with _engine_source(resolver, source) as engine_source:
                     source_prepare_seconds = time.perf_counter() - prepare_started

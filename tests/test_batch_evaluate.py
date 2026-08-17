@@ -489,3 +489,45 @@ def test_tar_materialized_source_is_cleaned_when_engine_fails(tmp_path: Path):
     record = json.loads(output.read_text(encoding="utf-8"))
     assert record["status"] == "error"
     assert record["error_type"] == "ValueError"
+
+
+def test_invalid_tar_uri_is_isolated_per_clip(tmp_path: Path):
+    manifest = tmp_path / "manifest.csv"
+    with manifest.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=["dataset", "split", "clip_id", "video_path", "has_fall"],
+        )
+        writer.writeheader()
+        writer.writerow(
+            {
+                "dataset": "urfd",
+                "split": "val",
+                "clip_id": "bad-tar",
+                "video_path": "tar://missing-delimiter",
+                "has_fall": "0",
+            }
+        )
+
+    class _EngineNeverCalled:
+        def cache_signature(self):
+            return {"algorithm_version": "v1"}
+
+        def analyze(self, source, *, render=False):
+            raise AssertionError("should not be called")
+
+    output = tmp_path / "predictions.jsonl"
+    with pytest.raises(RuntimeError, match="bad-tar"):
+        evaluate_manifest(
+            manifest,
+            engine=_EngineNeverCalled(),
+            dataset="urfd",
+            split="val",
+            mode="clip",
+            output_jsonl=output,
+            temp_root=tmp_path / "tmp",
+        )
+
+    record = json.loads(output.read_text(encoding="utf-8"))
+    assert record["status"] == "error"
+    assert record["source_kind"] == "unknown"
