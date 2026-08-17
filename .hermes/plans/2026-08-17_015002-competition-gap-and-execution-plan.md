@@ -135,6 +135,7 @@ supersedes_execution_order: 2026-08-16_234916-next-stage-multi-agent-plan.md
 - 相同输入和 seed 生成确定性元数据；
 - smoke 第二次运行 4/4 resume 且 YOLO 零调用；
 - 20-clip 实测决定全量 10,800 train+val 或确定性分层 train 子集 + 完整 1,200 val；
+- 在扩正式 cache 前，先用 canary NPZ 通过最小 per-track window、padding/mask、标签边界 consumer 契约；
 - 训练代码只读 NPZ，不允许每个 epoch 重跑 YOLO。
 
 ### Gate 3 — 2026-08-22 至 2026-08-25：TCN 与长尾增强

@@ -3,8 +3,8 @@
 > **更新时间**：2026-08-17
 > **当前分支**：`feat/pose-cache`（worktree：`D:\HermesWorkspace\Detictive-wt-pose-cache`）
 > **基线分支**：`master` @ `1624ec0`
-> **状态**：Gate 1 已合并；Gate 2 的 4 个 review P1、118 tests 和最终 4/4 rebuild→resume 均通过，仅等待 closure review
-> **下一门**：closure review PASS 后合并 Gate 2A；再补 evaluator/InferenceEngine tar-source tracer并做 20-clip val canary；不读取 test
+> **状态**：Gate 1 已合并；Gate 2A 的 4 个 review P1、118 tests、最终 4/4 rebuild→resume 和双路 closure review 均通过，等待 fast-forward 合并
+> **下一门**：合并 Gate 2A；再补 evaluator/InferenceEngine tar-source tracer，运行冻结的 20-clip val canary并验证最小 NPZ→TCN consumer；不读取 test
 
 ## 1. 当前事实
 
@@ -118,6 +118,7 @@ Feature 分支提交：
 8e4539f feat: extract resumable pose caches from manifest
 a860a2d feat: harden pose cache resume telemetry
 bc3ad28 fix: enforce deterministic pose track rows
+f5f1ea0 fix: bind pose caches to consumed bytes
 ```
 
 计划 checkpoint 已在 master：
@@ -137,14 +138,15 @@ bc3ad28 fix: enforce deterministic pose track rows
 
 执行顺序：
 
-1. 固定当前 HEAD，完成 4 个 P1 的 closure review 后合并 Gate 2A；
+1. fast-forward 合并已通过双路 closure review 的 Gate 2A；
 2. TDD 接入 `evaluate_manifest -> InferenceEngine -> VideoSourceResolver` 的 tar URI，规则/event 逻辑不变；
 3. 从 val 确定性选择 20 clips，覆盖 URFD/OF-Syn、正负样本和 hard negatives；
 4. 记录每 clip：源读取/解包时间、YOLO+tracking 时间、总时间、NPZ 大小、T/P/有效 observation、失败类型；
 5. 立即重跑，必须 20/20 resume 且零 YOLO；
-6. 根据实测吞吐外推 1,200 val 和 train cache 成本；
-7. 只有 canary 无 schema/恢复问题后才冻结配置并扩容；
-8. 只有正式 train/val cache 覆盖率和反向审计通过后才启动 TCN pilot。
+6. 用 canary NPZ 先验证最小 per-track window、padding/mask 和标签边界 consumer；
+7. 根据实测吞吐外推 1,200 val 和 train cache 成本；
+8. 只有 canary 无 schema/恢复问题后才冻结配置并扩容；
+9. 只有正式 train/val cache 覆盖率和反向审计通过后才启动 TCN pilot。
 
 ## 7. 禁止事项
 

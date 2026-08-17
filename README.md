@@ -179,12 +179,13 @@ tests/                       自动化测试
 
 ## 下一阶段
 
-1. 完成 Gate 2A focused-review closure 并合并；最终 4-clip rebuild/resume 已通过；
+1. fast-forward 合并已通过双路 focused-review closure 的 Gate 2A；
 2. TDD 接入 `evaluate_manifest/InferenceEngine` 的共享 tar resolver，不改规则/event 语义；
 3. 运行 20-clip val canary，记录每 clip 解包/推理/总时延、cache 大小和失败类型；
-4. canary 通过后冻结 pose cache schema/config，再扩完整 OF-Syn val 与预算内 train cache；
-5. 只有 train/val cache 覆盖率和审计通过后，才启动 FallTCN pilot；
-6. 再做低光/遮挡实验和规则/TCN 消融，最后决定是否需要外观通道。
+4. 用 canary NPZ 先验证最小 per-track window、padding/mask 和标签边界 consumer；
+5. canary 通过后冻结 pose cache schema/config，再扩完整 OF-Syn val 与预算内 train cache；
+6. 只有 train/val cache 覆盖率和审计通过后，才启动 FallTCN pilot；
+7. 再做低光/遮挡实验和规则/TCN 消融，最后决定是否需要外观通道。
 
 ## 当前限制
 
