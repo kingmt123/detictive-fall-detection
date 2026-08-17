@@ -123,6 +123,17 @@ def _validate_record(record: PoseCacheRecord) -> None:
         raise ValueError("padding observation 的 track_id 必须为 -1")
     if np.any(record.track_ids[record.valid_mask] < 0):
         raise ValueError("有效 observation 的 track_id 必须为非负整数")
+    for frame_track_ids, frame_valid_mask in zip(
+        record.track_ids, record.valid_mask, strict=True
+    ):
+        valid_count = int(frame_valid_mask.sum())
+        if not np.all(frame_valid_mask[:valid_count]) or np.any(
+            frame_valid_mask[valid_count:]
+        ):
+            raise ValueError("valid observation 必须按 track_ids 打包在每帧前缀")
+        valid_track_ids = frame_track_ids[:valid_count]
+        if valid_track_ids.size > 1 and np.any(np.diff(valid_track_ids) <= 0):
+            raise ValueError("每帧有效 track_ids 必须唯一且严格递增")
     if (
         record.frame_size.dtype != np.int64
         or record.frame_size.shape != (2,)

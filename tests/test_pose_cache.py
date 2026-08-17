@@ -200,3 +200,38 @@ def test_writer_rejects_invalid_content_sha256(tmp_path: Path):
 
     with pytest.raises(ValueError, match="SHA-256"):
         write_pose_cache(tmp_path / "bad.npz", record)
+
+
+@pytest.mark.parametrize(
+    "track_ids,valid_mask",
+    [
+        (
+            np.array([[2, 1], [2, 1]], dtype=np.int64),
+            np.ones((2, 2), dtype=np.bool_),
+        ),
+        (
+            np.array([[1, 1], [1, 1]], dtype=np.int64),
+            np.ones((2, 2), dtype=np.bool_),
+        ),
+        (
+            np.array([[-1, 1], [-1, 1]], dtype=np.int64),
+            np.array([[False, True], [False, True]], dtype=np.bool_),
+        ),
+    ],
+)
+def test_writer_rejects_unpacked_duplicate_or_unsorted_track_ids(
+    tmp_path: Path,
+    track_ids: np.ndarray,
+    valid_mask: np.ndarray,
+):
+    base = _one_person_record()
+    invalid = replace(
+        base,
+        keypoints=np.zeros((2, 2, 17, 3), dtype=np.float32),
+        bboxes=np.zeros((2, 2, 4), dtype=np.float32),
+        track_ids=track_ids,
+        valid_mask=valid_mask,
+    )
+
+    with pytest.raises(ValueError, match="track_ids"):
+        write_pose_cache(tmp_path / "invalid-tracks.npz", invalid)

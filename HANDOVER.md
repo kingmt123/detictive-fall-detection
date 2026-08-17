@@ -17,7 +17,7 @@
 | Pose cache | 支持 | 原子 NPZ、严格 dtype/shape、源内容 SHA、提取签名 |
 | Cache-first 提取 | 支持 | `tools/extract_keypoints.py`，单模型复用、显式 dataset/split |
 | 真实 smoke | 4/4 完成 | 2 URFD val + 2 OF-Syn val；重跑 4/4 resume |
-| 自动化测试 | 109 passed | `python -m pytest -q` |
+| 自动化测试 | 114 passed | `python -m pytest -q` |
 | FallTCN | 仅结构/单测 | 尚无正式 train cache、checkpoint、真实指标 |
 
 ## 2. Gate 2 实现
@@ -115,6 +115,7 @@ Feature 分支提交：
 788a077 feat: add unified local and tar video source
 76f5ef0 feat: add atomic validated pose cache schema
 8e4539f feat: extract resumable pose caches from manifest
+a860a2d feat: harden pose cache resume telemetry
 ```
 
 计划 checkpoint 已在 master：
