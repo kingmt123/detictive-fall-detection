@@ -5,7 +5,10 @@ import argparse
 import csv
 import hashlib
 import json
+import time
 from collections import Counter
+from collections.abc import Iterator
+from contextlib import contextmanager
 from dataclasses import asdict
 from pathlib import Path
 from typing import Any, Literal
@@ -13,6 +16,7 @@ from typing import Any, Literal
 import numpy as np
 
 from eval.metrics import competition_map
+from pipeline.video_source import LocalSource, VideoSourceResolver, parse_video_source
 
 EvaluationMode = Literal["clip"]
 
@@ -50,6 +54,7 @@ def _run_config(
     cache_signature = getattr(engine, "cache_signature", None)
     inference_signature = cache_signature() if callable(cache_signature) else None
     eval_root = Path(__file__).resolve().parent
+    project_root = eval_root.parent
     return {
         "cache_schema": 2,
         "dataset": dataset,
@@ -57,7 +62,11 @@ def _run_config(
         "mode": mode,
         "manifest_sha256": _sha256(manifest_path),
         "evaluation_code_sha256": _source_bundle_sha256(
-            (Path(__file__).resolve(), eval_root / "metrics.py")
+            (
+                Path(__file__).resolve(),
+                eval_root / "metrics.py",
+                project_root / "pipeline" / "video_source.py",
+            )
         ),
         "inference_signature": inference_signature,
         "model": model_path,
@@ -117,13 +126,34 @@ def _read_existing(path: Path, expected_run_id: str) -> dict[str, dict]:
     return latest_success
 
 
-def _resolve_video_path(video_path: str, manifest_path: Path) -> Path:
-    path = Path(video_path)
-    if path.is_absolute():
-        return path
+def _manifest_root(manifest_path: Path) -> Path:
     # 正式 manifest 位于 <project>/data/manifest.csv，路径相对项目根目录。
-    root = manifest_path.parent.parent if manifest_path.parent.name == "data" else Path.cwd()
-    return root / path
+    return manifest_path.parent.parent if manifest_path.parent.name == "data" else Path.cwd()
+
+
+def _resolve_video_source(video_path: str, manifest_path: Path) -> str | Path:
+    parsed = parse_video_source(video_path)
+    if isinstance(parsed, LocalSource):
+        if parsed.path.is_absolute():
+            return parsed.path
+        return _manifest_root(manifest_path) / parsed.path
+
+    archive_path = parsed.archive_path
+    if not archive_path.is_absolute():
+        archive_path = _manifest_root(manifest_path) / archive_path
+    return f"tar://{archive_path}!/{parsed.member}"
+
+
+@contextmanager
+def _engine_source(
+    resolver: VideoSourceResolver, source: str | Path
+) -> Iterator[Path]:
+    parsed = parse_video_source(source)
+    if isinstance(parsed, LocalSource):
+        yield parsed.path
+        return
+    with resolver.materialize(source) as materialized:
+        yield materialized.local_path
 
 
 def _metric_payload(labels: dict[str, bool], scores: dict[str, float]) -> dict:
@@ -209,6 +239,7 @@ def evaluate_manifest(
     mode: EvaluationMode,
     output_jsonl: Path,
     allow_test_once: bool = False,
+    temp_root: Path | None = None,
 ) -> dict:
     """评测显式 dataset/split；失败 clip 会记录错误并使整次运行失败。"""
     if mode != "clip":
@@ -220,6 +251,11 @@ def evaluate_manifest(
 
     manifest_path = Path(manifest_path)
     output_jsonl = Path(output_jsonl)
+    temp_root = (
+        Path(temp_root)
+        if temp_root is not None
+        else output_jsonl.parent / ".video-source-temp"
+    )
     with manifest_path.open(encoding="utf-8", newline="") as handle:
         reader = csv.DictReader(handle)
         required_fields = {"dataset", "split", "clip_id", "video_path", "has_fall"}
@@ -266,12 +302,21 @@ def evaluate_manifest(
     output_jsonl.parent.mkdir(parents=True, exist_ok=True)
     failures: list[str] = []
 
-    with output_jsonl.open("a", encoding="utf-8") as output:
+    with (
+        VideoSourceResolver(temp_root) as resolver,
+        output_jsonl.open("a", encoding="utf-8") as output,
+    ):
         for row in selected:
             clip_id = row["clip_id"]
             if clip_id in successful:
                 continue
-            source = _resolve_video_path(row["video_path"], manifest_path)
+            source = _resolve_video_source(row["video_path"], manifest_path)
+            source_kind = (
+                "local"
+                if isinstance(parse_video_source(source), LocalSource)
+                else "tar"
+            )
+            source_prepare_seconds: float | None = None
             base_record = {
                 "run_id": run_id,
                 "dataset": dataset,
@@ -279,9 +324,13 @@ def evaluate_manifest(
                 "mode": mode,
                 "clip_id": clip_id,
                 "video_path": row["video_path"],
+                "source_kind": source_kind,
             }
             try:
-                payload = engine.analyze(source, render=False)
+                prepare_started = time.perf_counter()
+                with _engine_source(resolver, source) as engine_source:
+                    source_prepare_seconds = time.perf_counter() - prepare_started
+                    payload = engine.analyze(engine_source, render=False)
                 score = float(payload["clip_score"])
                 if not np.isfinite(score) or not 0.0 <= score <= 1.0:
                     raise ValueError(f"非法 clip_score: {score}")
@@ -294,6 +343,7 @@ def evaluate_manifest(
                     "processed_frames": payload.get("processed_frames"),
                     "fps": payload.get("fps"),
                     "stage_latency_ms": payload.get("stage_latency_ms", {}),
+                    "source_prepare_seconds": source_prepare_seconds,
                 }
                 successful[clip_id] = record
             except Exception as exc:  # noqa: BLE001 - 逐 clip 记录后统一失败
@@ -302,6 +352,7 @@ def evaluate_manifest(
                     "status": "error",
                     "error_type": type(exc).__name__,
                     "error": str(exc),
+                    "source_prepare_seconds": source_prepare_seconds,
                 }
                 failures.append(clip_id)
             output.write(json.dumps(record, ensure_ascii=False) + "\n")
@@ -349,6 +400,12 @@ def main() -> None:
     parser.add_argument("--imgsz", type=int, default=640)
     parser.add_argument("--conf", type=float, default=0.10)
     parser.add_argument(
+        "--temp-root",
+        type=Path,
+        default=Path("runs/tmp/evaluate_manifest"),
+        help="tar 视频成员的显式临时目录",
+    )
+    parser.add_argument(
         "--allow-test-once",
         action="store_true",
         help="仅在最终模型冻结后允许一次 test 运行",
@@ -370,6 +427,7 @@ def main() -> None:
         mode=args.mode,
         output_jsonl=args.output,
         allow_test_once=args.allow_test_once,
+        temp_root=args.temp_root,
     )
     text = json.dumps(summary, ensure_ascii=False, indent=2)
     if args.summary is not None:

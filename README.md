@@ -12,7 +12,7 @@ FallTCN 接口用于后续监督训练。
 - 输出包含 `track_id` 的跌倒事件 JSON 和带骨架、分数、告警横幅的 MP4；
 - 支持 clip-level 与代理 event-level P@R90/P@R95/MAP；
 - 构建 URFD 按试次分组、OF-Syn 按官方随机 split 的 manifest；不混用 test 调参；
-- pose-cache 路径统一读取普通 MP4 与 `tar://archive!/member`，生成原子、可校验、可断点续跑的多人姿态 NPZ cache；rule evaluator 的 tar 接入是下一 tracer。
+- pose-cache 与 rule evaluator 统一读取普通 MP4 与 `tar://archive!/member`；姿态 NPZ 原子、可校验、可断点续跑。
 
 > 当前规则模型是可展示基线，不是最终竞赛模型。官方尚未明确事件匹配协议；
 > `eval/metrics.py` 的 event 模式使用 temporal IoU=0.3 的显式代理假设。
@@ -82,7 +82,8 @@ python infer.py data/sources/urfd/adl-01-cam0.mp4 \
 python -m eval.evaluate_manifest \
   --manifest data/manifest.csv --dataset urfd --split val --mode clip \
   --output runs/eval/urfd_val_predictions.jsonl \
-  --summary runs/eval/urfd_val_summary.json
+  --summary runs/eval/urfd_val_summary.json \
+  --temp-root runs/tmp/evaluate_manifest
 ```
 
 2026-08-17 在本机 RTX 4060 实跑 URFD val 14 clips（8 fall / 6 ADL）：
@@ -135,7 +136,7 @@ D: 项目目录下的 `runs/`，不占用仅剩约 5.8GB 的 C:。
 python -m pytest -q
 ```
 
-当前 **118 个测试**覆盖：评测指标、事件聚合、标签语义、manifest 划分、姿态规则、
+当前 **120 个测试**覆盖：评测指标、事件聚合、标签语义、manifest 划分、姿态规则、
 多目标跟踪、可复用推理、断点评测、统一视频源、原子姿态 cache、cache-first 提取、
 融合及 TCN 形状/参数/因果性。
 
@@ -179,18 +180,16 @@ tests/                       自动化测试
 
 ## 下一阶段
 
-1. fast-forward 合并已通过双路 focused-review closure 的 Gate 2A；
-2. TDD 接入 `evaluate_manifest/InferenceEngine` 的共享 tar resolver，不改规则/event 语义；
-3. 运行 20-clip val canary，记录每 clip 解包/推理/总时延、cache 大小和失败类型；
-4. 用 canary NPZ 先验证最小 per-track window、padding/mask 和标签边界 consumer；
-5. canary 通过后冻结 pose cache schema/config，再扩完整 OF-Syn val 与预算内 train cache；
-6. 只有 train/val cache 覆盖率和审计通过后，才启动 FallTCN pilot；
-7. 再做低光/遮挡实验和规则/TCN 消融，最后决定是否需要外观通道。
+1. focused review/merge 已完成真实 OF-Syn tar smoke→resume 的 Gate 2B；
+2. 运行冻结的 20-clip val canary，记录每 clip 解包/推理/总时延、cache 大小和失败类型；
+3. 用 canary NPZ 先验证最小 per-track window、padding/mask 和标签边界 consumer；
+4. canary 通过后冻结 pose cache schema/config，再扩完整 OF-Syn val 与预算内 train cache；
+5. 只有 train/val cache 覆盖率和审计通过后，才启动 FallTCN pilot；
+6. 再做低光/遮挡实验和规则/TCN 消融，最后决定是否需要外观通道。
 
 ## 当前限制
 
 - 已有 URFD val clip-level 基线和 4-clip pose cache smoke，但 OF-Syn 1,200 条 val 尚未完成缓存/评测。
-- 当前共享 resolver 已服务 pose extractor，但 rule evaluator 仍会把 tar URI 当作普通 `Path`；Gate 2B 必须先修此入口。
 - 已验证 1920×1080 输入预处理兼容性，但尚未完成 1080P 视频端到端时延基准。
 - `eval/benchmark.py` 的 47.92ms 是 YOLO predict 微基准，不是完整端到端告警时延。
 - 多目标跟踪采用轻量 IoU + 常速度中心预测，没有 ReID；首次交叉、复杂遮挡和长时间离场仍可能造成 ID 碎片。

@@ -1,10 +1,10 @@
 # 视觉实时跌倒检测竞赛项目 — AI 交接文档
 
 > **更新时间**：2026-08-17
-> **当前分支**：`feat/pose-cache`（worktree：`D:\HermesWorkspace\Detictive-wt-pose-cache`）
-> **基线分支**：`master` @ `1624ec0`
-> **状态**：Gate 1 已合并；Gate 2A 的 4 个 review P1、118 tests、最终 4/4 rebuild→resume 和双路 closure review 均通过，等待 fast-forward 合并
-> **下一门**：合并 Gate 2A；再补 evaluator/InferenceEngine tar-source tracer，运行冻结的 20-clip val canary并验证最小 NPZ→TCN consumer；不读取 test
+> **当前分支**：`feat/tar-evaluator`（worktree：`D:\HermesWorkspace\Detictive-wt-tar-eval`）
+> **基线分支**：`master` @ `a52f37d`
+> **状态**：Gate 2A 已合并；Gate 2B rule evaluator tar tracer、120 tests 和真实 OF-Syn val smoke→resume 已通过，等待 focused review
+> **下一门**：review/merge Gate 2B 后运行冻结的 20-clip val canary，再验证最小 NPZ→TCN consumer；不读取 test
 
 ## 1. 当前事实
 
@@ -13,11 +13,11 @@
 | URFD val 规则基线 | 14/14 完成 | P@R90=0.80、P@R95=0.80、本地 clip MAP=80.0% |
 | Test split | 未使用 | 批量评测有持久化 one-shot seal；pose cache 阶段直接拒绝 test |
 | 普通 MP4 | 支持 | `pipeline/video_source.py` |
-| OF-Syn tar URI | Pose cache 路径支持 | 严格 `tar://archive!/member`，批次内复用 tar handle；rule evaluator 尚待接入 |
+| OF-Syn tar URI | Pose cache 与 rule evaluator 均支持 | 严格 `tar://archive!/member`，批次内复用 tar handle |
 | Pose cache | 支持 | 原子 NPZ、严格 dtype/shape、源内容 SHA、提取签名 |
 | Cache-first 提取 | 支持 | `tools/extract_keypoints.py`，单模型复用、显式 dataset/split |
 | 真实 smoke | 4/4 完成 | 2 URFD val + 2 OF-Syn val；重跑 4/4 resume |
-| 自动化测试 | 118 passed | `python -m pytest -q` |
+| 自动化测试 | 120 passed | `python -m pytest -q` |
 | FallTCN | 仅结构/单测 | 尚无正式 train cache、checkpoint、真实指标 |
 
 ## 2. Gate 2 实现
@@ -61,6 +61,18 @@
 - device、image size、confidence、crop；
 - `max_frames`，防止 smoke 截帧 cache 被全片训练误复用。
 
+### 2.4 Rule evaluator tar tracer
+
+`eval/evaluate_manifest.py`：
+
+- local manifest 行保持原 `Path` 直通 engine；
+- tar URI 经批次级共享 resolver 流式 materialize 后交给现有 `InferenceEngine`；
+- JSONL 记录 `source_kind` 和 `source_prepare_seconds`，不把 tar 解包混入帧级 engine latency；
+- evaluator run signature 纳入 `video_source.py`；
+- 正常、engine 失败和 resume 路径均有测试，临时目录退出后为空。
+
+真实 tracer：OF-Syn val `fall/fall_ch_026` 首次 `clips_succeeded=1, clips_resumed=0`，第二次 `clips_resumed=1`，test 未读取。
+
 ## 3. 真实 smoke 证据
 
 使用 val-only 样本：
@@ -87,7 +99,7 @@ smoke cache 位于 feature worktree 的 `runs/pose_cache_smoke/`，被 Git 忽�
 ## 4. 复现命令
 
 ```bash
-cd /d/HermesWorkspace/Detictive-wt-pose-cache
+cd /d/HermesWorkspace/Detictive
 
 python -m tools.extract_keypoints \
   --manifest D:/HermesWorkspace/Detictive/data/manifest.csv \
@@ -119,15 +131,16 @@ Feature 分支提交：
 a860a2d feat: harden pose cache resume telemetry
 bc3ad28 fix: enforce deterministic pose track rows
 f5f1ea0 fix: bind pose caches to consumed bytes
+a52f37d docs: close pose cache implementation gate
 ```
 
-计划 checkpoint 已在 master：
+Gate 2A 已 fast-forward 合并到 master：
 
 ```text
-1624ec0 docs: define pose cache gate and acceptance criteria
+a52f37d docs: close pose cache implementation gate
 ```
 
-在 focused review 和最终回归通过前不要合并；不要 push，除非用户明确要求。
+Gate 2B 在 focused review 和最终回归通过前不要合并；不要 push，除非用户明确要求。
 
 ## 6. 下一步：20-clip canary
 
@@ -138,15 +151,14 @@ f5f1ea0 fix: bind pose caches to consumed bytes
 
 执行顺序：
 
-1. fast-forward 合并已通过双路 closure review 的 Gate 2A；
-2. TDD 接入 `evaluate_manifest -> InferenceEngine -> VideoSourceResolver` 的 tar URI，规则/event 逻辑不变；
-3. 从 val 确定性选择 20 clips，覆盖 URFD/OF-Syn、正负样本和 hard negatives；
-4. 记录每 clip：源读取/解包时间、YOLO+tracking 时间、总时间、NPZ 大小、T/P/有效 observation、失败类型；
-5. 立即重跑，必须 20/20 resume 且零 YOLO；
-6. 用 canary NPZ 先验证最小 per-track window、padding/mask 和标签边界 consumer；
-7. 根据实测吞吐外推 1,200 val 和 train cache 成本；
-8. 只有 canary 无 schema/恢复问题后才冻结配置并扩容；
-9. 只有正式 train/val cache 覆盖率和反向审计通过后才启动 TCN pilot。
+1. focused review/merge 已完成真实 tracer 的 Gate 2B；
+2. 运行冻结的 20 个 val clips，覆盖 URFD/OF-Syn、正负样本和 hard negatives；
+3. 记录每 clip：源读取/解包时间、YOLO+tracking 时间、总时间、NPZ 大小、T/P/有效 observation、失败类型；
+4. 立即重跑，必须 20/20 resume 且零 YOLO；
+5. 用 canary NPZ 先验证最小 per-track window、padding/mask 和标签边界 consumer；
+6. 根据实测吞吐外推 1,200 val 和 train cache 成本；
+7. 只有 canary 无 schema/恢复问题后才冻结配置并扩容；
+8. 只有正式 train/val cache 覆盖率和反向审计通过后才启动 TCN pilot。
 
 ## 7. 禁止事项
 
@@ -162,7 +174,6 @@ f5f1ea0 fix: bind pose caches to consumed bytes
 ## 8. 当前已知限制
 
 - OF-Syn 完整 1,200 val 尚未缓存/评测；
-- `eval/evaluate_manifest.py` / `InferenceEngine.analyze()` 尚未通过共享 resolver 消费 tar URI；
 - 还没有 20-clip 吞吐和 cache 容量外推；
 - dense `[T,P,...]` schema 已 smoke，但 TCN dataset consumer 尚未实现；
 - 多目标 tracker 无 ReID，复杂遮挡/交叉可能产生 ID 碎片；

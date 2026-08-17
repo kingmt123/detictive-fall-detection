@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import csv
+import io
 import json
+import tarfile
 from pathlib import Path
 
 import pytest
@@ -364,3 +366,126 @@ def test_test_seal_allows_same_run_resume_after_failure(tmp_path: Path):
     )
     assert summary["clips_succeeded"] == 1
     assert json.loads(seal.read_text(encoding="utf-8"))["state"] == "completed"
+
+
+def test_tar_manifest_source_is_materialized_for_engine_and_cleaned(tmp_path: Path):
+    data_dir = tmp_path / "data"
+    data_dir.mkdir()
+    archive = data_dir / "videos.tar"
+    video_bytes = b"synthetic-video-bytes"
+    with tarfile.open(archive, "w") as tar:
+        info = tarfile.TarInfo("clips/fall-a.mp4")
+        info.size = len(video_bytes)
+        tar.addfile(info, io.BytesIO(video_bytes))
+
+    manifest = data_dir / "manifest.csv"
+    with manifest.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=["dataset", "split", "clip_id", "video_path", "has_fall"],
+        )
+        writer.writeheader()
+        writer.writerow(
+            {
+                "dataset": "of-syn",
+                "split": "val",
+                "clip_id": "fall-a",
+                "video_path": "tar://data/videos.tar!/clips/fall-a.mp4",
+                "has_fall": "1",
+            }
+        )
+
+    class _ContentEngine:
+        def __init__(self):
+            self.materialized_paths: list[Path] = []
+
+        def cache_signature(self):
+            return {"algorithm_version": "tar-tracer-v1"}
+
+        def analyze(self, source: Path, *, render: bool = False):
+            assert render is False
+            source = Path(source)
+            assert source.read_bytes() == video_bytes
+            self.materialized_paths.append(source)
+            return {"clip_score": 0.9, "events": []}
+
+    engine = _ContentEngine()
+    temp_root = tmp_path / "materialized"
+    output = tmp_path / "predictions.jsonl"
+    summary = evaluate_manifest(
+        manifest,
+        engine=engine,
+        dataset="of-syn",
+        split="val",
+        mode="clip",
+        output_jsonl=output,
+        temp_root=temp_root,
+    )
+
+    assert summary["clips_succeeded"] == 1
+    assert len(engine.materialized_paths) == 1
+    assert not engine.materialized_paths[0].exists()
+    assert list(temp_root.iterdir()) == []
+    record = json.loads(output.read_text(encoding="utf-8"))
+    assert record["source_kind"] == "tar"
+    assert record["source_prepare_seconds"] >= 0.0
+
+
+def test_tar_materialized_source_is_cleaned_when_engine_fails(tmp_path: Path):
+    archive = tmp_path / "videos.tar"
+    video_bytes = b"broken-video"
+    with tarfile.open(archive, "w") as tar:
+        info = tarfile.TarInfo("broken.mp4")
+        info.size = len(video_bytes)
+        tar.addfile(info, io.BytesIO(video_bytes))
+
+    manifest = tmp_path / "manifest.csv"
+    with manifest.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(
+            handle,
+            fieldnames=["dataset", "split", "clip_id", "video_path", "has_fall"],
+        )
+        writer.writeheader()
+        writer.writerow(
+            {
+                "dataset": "of-syn",
+                "split": "val",
+                "clip_id": "broken",
+                "video_path": f"tar://{archive}!/broken.mp4",
+                "has_fall": "0",
+            }
+        )
+
+    class _FailingEngine:
+        def __init__(self):
+            self.materialized_path: Path | None = None
+
+        def cache_signature(self):
+            return {"algorithm_version": "tar-failure-v1"}
+
+        def analyze(self, source: Path, *, render: bool = False):
+            assert render is False
+            self.materialized_path = Path(source)
+            assert self.materialized_path.read_bytes() == video_bytes
+            raise ValueError("decoder failed")
+
+    engine = _FailingEngine()
+    temp_root = tmp_path / "materialized"
+    output = tmp_path / "predictions.jsonl"
+    with pytest.raises(RuntimeError, match="broken"):
+        evaluate_manifest(
+            manifest,
+            engine=engine,
+            dataset="of-syn",
+            split="val",
+            mode="clip",
+            output_jsonl=output,
+            temp_root=temp_root,
+        )
+
+    assert engine.materialized_path is not None
+    assert not engine.materialized_path.exists()
+    assert list(temp_root.iterdir()) == []
+    record = json.loads(output.read_text(encoding="utf-8"))
+    assert record["status"] == "error"
+    assert record["error_type"] == "ValueError"
