@@ -11,7 +11,8 @@ FallTCN 接口用于后续监督训练。
 - 同时利用累计质心下坠与躯干倾斜，抑制“走向摄像机”的假下坠；
 - 输出包含 `track_id` 的跌倒事件 JSON 和带骨架、分数、告警横幅的 MP4；
 - 支持 clip-level 与代理 event-level P@R90/P@R95/MAP；
-- 构建 URFD 按试次分组、OF-Syn 按官方随机 split 的 manifest；不混用 test 调参。
+- 构建 URFD 按试次分组、OF-Syn 按官方随机 split 的 manifest；不混用 test 调参；
+- 统一读取普通 MP4 与 `tar://archive!/member`，生成原子、可校验、可断点续跑的多人姿态 NPZ cache。
 
 > 当前规则模型是可展示基线，不是最终竞赛模型。官方尚未明确事件匹配协议；
 > `eval/metrics.py` 的 event 模式使用 temporal IoU=0.3 的显式代理假设。
@@ -99,14 +100,42 @@ python -m eval.evaluate_manifest \
 所属项目的 `runs/eval/test_split.seal.json` 持久化消费状态。失败或中断只能续跑
 同一 run/output，成功后再次运行会被拒绝。
 
+## 姿态缓存
+
+姿态缓存入口复用单个 YOLO 模型，保留每一解码帧，并把可变人数 padding 为
+`keypoints[T,P,17,3]`、`bboxes[T,P,4]`、`track_ids[T,P]` 和
+`valid_mask[T,P]`。缓存签名绑定模型字节、相关源码、依赖版本、crop 和
+`max_frames`；resume 同时验证源身份和内容 SHA-256。`test` 在该阶段一律拒绝。
+
+先运行 val-only 4-clip smoke，不要直接启动 12,000 clips：
+
+```bash
+python -m tools.extract_keypoints \
+  --manifest data/manifest.csv --dataset urfd --split val \
+  --cache-root runs/pose_cache_smoke --temp-root runs/tmp/pose_cache_smoke \
+  --model yolo11n-pose.pt --device 0 --crop auto \
+  --clip-id fall-18-cam0 --clip-id adl-02-cam0
+
+python -m tools.extract_keypoints \
+  --manifest data/manifest.csv --dataset of-syn --split val \
+  --cache-root runs/pose_cache_smoke --temp-root runs/tmp/pose_cache_smoke \
+  --model yolo11n-pose.pt --device 0 --crop auto \
+  --clip-id fall/fall_ch_026 --clip-id fall/fall_ch_085
+```
+
+2026-08-17 本机实跑：4/4 全片成功；第二次运行 4/4 命中 resume、零 YOLO；
+NPZ 帧数与重新解码帧数完全一致，tar 临时目录退出后为空。缓存和临时视频都位于
+D: 项目目录下的 `runs/`，不占用仅剩约 5.8GB 的 C:。
+
 ## 测试
 
 ```bash
 python -m pytest -q
 ```
 
-当前 **86 个测试**覆盖：评测指标、事件聚合、标签语义、manifest 划分、姿态规则、
-多目标跟踪、可复用推理、断点缓存、融合、TCN 形状/参数/因果性。
+当前 **111 个测试**覆盖：评测指标、事件聚合、标签语义、manifest 划分、姿态规则、
+多目标跟踪、可复用推理、断点评测、统一视频源、原子姿态 cache、cache-first 提取、
+融合及 TCN 形状/参数/因果性。
 
 ## 性能基准
 
@@ -134,26 +163,30 @@ eval/evaluate_manifest.py    显式 split 的断点批量评测
 infer.py                     视频到事件 JSON/可视化 MP4
 models/tcn.py                0.134M 因果 FallTCN
 pipeline/inference_engine.py 单模型复用和无渲染推理
+pipeline/video_source.py    本地 MP4/tar 成员统一解析、内容哈希与临时生命周期
+pipeline/pose_extractor.py  单模型逐帧多人姿态提取
+pipeline/pose_cache.py      原子、严格 schema 的 NPZ cache
 pipeline/pose_track.py       多目标姿态跟踪与生命周期
 pipeline/rules.py            姿态物理特征
 pipeline/fusion.py           累计下坠与姿态融合
 pipeline/event_aggregator.py 帧分数到事件
 tools/build_manifest.py      无泄漏视频 manifest
+tools/extract_keypoints.py   显式 split 的 cache-first 姿态批量提取
 tests/                       自动化测试
 ```
 
 ## 下一阶段
 
-1. 实现普通 MP4 + OF-Syn tar 的统一读取和可断点 pose cache；
-2. 在小规模缓存 smoke 通过后才训练 FallTCN；
-3. 加入低光、灰度/红外模拟和遮挡增强；
-4. 经消融后再决定是否加入独立外观 YOLO 通道；
-5. 确认官方评测与 NPU 20MB 口径后冻结提交格式。
+1. 运行 20-clip val canary，记录每 clip 解包/推理/总时延、cache 大小和失败类型；
+2. canary 通过后冻结 pose cache schema/config，再扩完整 OF-Syn val 与预算内 train cache；
+3. 只有 train/val cache 覆盖率和审计通过后，才接入 FallTCN dataset/training；
+4. 加入低光、灰度/红外模拟和遮挡增强，并做规则/TCN 消融；
+5. 经消融后再决定是否加入独立外观 YOLO 通道；确认官方口径后冻结提交格式。
 
 ## 当前限制
 
-- 已有小规模 URFD val clip-level 基线，但 URFD 无事件级 GT，且 OF-Syn 1,200 条 val 尚未评测。
+- 已有 URFD val clip-level 基线和 4-clip pose cache smoke，但 OF-Syn 1,200 条 val 尚未完成缓存/评测。
 - 已验证 1920×1080 输入预处理兼容性，但尚未完成 1080P 视频端到端时延基准。
 - `eval/benchmark.py` 的 47.92ms 是 YOLO predict 微基准，不是完整端到端告警时延。
 - 多目标跟踪采用轻量 IoU + 常速度中心预测，没有 ReID；首次交叉、复杂遮挡和长时间离场仍可能造成 ID 碎片。
-- FallTCN 只有网络结构和单元测试，尚无关键点缓存、训练 checkpoint 或真实指标。
+- FallTCN 只有网络结构和单元测试；已有 cache schema/smoke，但尚无正式 train cache、训练 checkpoint 或真实指标。

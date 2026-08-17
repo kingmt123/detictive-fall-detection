@@ -4,6 +4,7 @@ from __future__ import annotations
 import argparse
 import csv
 import json
+import time
 from collections import Counter
 from pathlib import Path
 from typing import Any
@@ -16,6 +17,14 @@ from pipeline.pose_cache import (
 )
 from pipeline.pose_extractor import PoseExtractor
 from pipeline.video_source import VideoSourceResolver
+
+
+class PoseExtractionBatchError(RuntimeError):
+    """一个或多个 clip 失败；成功 cache 仍可用于下次 resume。"""
+
+    def __init__(self, summary: dict[str, Any]) -> None:
+        self.summary = summary
+        super().__init__(f"{summary['failed']} 个 pose cache clip 提取失败")
 
 
 def _resolve_source(video_path: str, manifest_path: Path) -> str:
@@ -87,6 +96,109 @@ def _cache_matches_row(record: PoseCacheRecord, row: dict[str, str]) -> bool:
     )
 
 
+def _process_row(
+    row: dict[str, str],
+    *,
+    manifest_path: Path,
+    resolver: VideoSourceResolver,
+    extractor: Any,
+    dataset: str,
+    split: str,
+    cache_root: Path,
+    signature: dict[str, Any],
+    crop: str,
+    max_frames: int | None,
+) -> dict[str, Any]:
+    clip_started = time.perf_counter()
+    source = _resolve_source(row["video_path"], manifest_path)
+    probe_started = time.perf_counter()
+    source_identity = resolver.probe(source)
+    probe_seconds = time.perf_counter() - probe_started
+    cache_path = pose_cache_path(cache_root, dataset, split, row["clip_id"])
+    cache_existed = cache_path.exists()
+    cache_validation_seconds = 0.0
+    if cache_existed:
+        validation_started = time.perf_counter()
+        try:
+            cached = load_pose_cache(
+                cache_path,
+                expected_source_identity=source_identity,
+                expected_extractor_signature=signature,
+            )
+            if not _cache_matches_row(cached, row):
+                raise ValueError("pose cache manifest 身份不匹配")
+            if cached.source_content_sha256 != resolver.content_sha256(source):
+                raise ValueError("pose cache 源内容 SHA-256 不匹配")
+        except ValueError:
+            cache_validation_seconds = time.perf_counter() - validation_started
+        else:
+            cache_validation_seconds = time.perf_counter() - validation_started
+            return {
+                "dataset": dataset,
+                "split": split,
+                "clip_id": row["clip_id"],
+                "source_kind": source_identity["kind"],
+                "status": "resumed",
+                "frames": int(cached.frame_indices.size),
+                "max_people": int(cached.keypoints.shape[1]),
+                "observations": int(cached.valid_mask.sum()),
+                "cache_bytes": cache_path.stat().st_size,
+                "probe_seconds": probe_seconds,
+                "cache_validation_seconds": cache_validation_seconds,
+                "materialize_seconds": 0.0,
+                "extract_seconds": 0.0,
+                "write_seconds": 0.0,
+                "total_seconds": time.perf_counter() - clip_started,
+            }
+
+    materialize_started = time.perf_counter()
+    with resolver.materialize(source) as materialized:
+        materialize_seconds = time.perf_counter() - materialize_started
+        extract_started = time.perf_counter()
+        sequence = extractor.extract(
+            materialized.local_path,
+            crop=crop,
+            max_frames=max_frames,
+        )
+        extract_seconds = time.perf_counter() - extract_started
+        record = PoseCacheRecord(
+            clip_id=row["clip_id"],
+            dataset=dataset,
+            split=split,
+            source_identity=materialized.identity,
+            source_content_sha256=materialized.content_sha256,
+            extractor_signature=signature,
+            fps=sequence.fps,
+            frame_indices=sequence.frame_indices,
+            timestamps=sequence.timestamps,
+            keypoints=sequence.keypoints,
+            bboxes=sequence.bboxes,
+            track_ids=sequence.track_ids,
+            valid_mask=sequence.valid_mask,
+            frame_size=sequence.frame_size,
+        )
+        write_started = time.perf_counter()
+        write_pose_cache(cache_path, record)
+        write_seconds = time.perf_counter() - write_started
+    return {
+        "dataset": dataset,
+        "split": split,
+        "clip_id": row["clip_id"],
+        "source_kind": source_identity["kind"],
+        "status": "rebuilt" if cache_existed else "processed",
+        "frames": int(sequence.frame_indices.size),
+        "max_people": int(sequence.keypoints.shape[1]),
+        "observations": int(sequence.valid_mask.sum()),
+        "cache_bytes": cache_path.stat().st_size,
+        "probe_seconds": probe_seconds,
+        "cache_validation_seconds": cache_validation_seconds,
+        "materialize_seconds": materialize_seconds,
+        "extract_seconds": extract_seconds,
+        "write_seconds": write_seconds,
+        "total_seconds": time.perf_counter() - clip_started,
+    }
+
+
 def extract_manifest(
     manifest_path: Path,
     *,
@@ -99,7 +211,7 @@ def extract_manifest(
     max_frames: int | None = None,
     clip_ids: set[str] | None = None,
     limit: int | None = None,
-) -> dict[str, int]:
+) -> dict[str, Any]:
     """验证已有 cache 后 resume；陈旧/损坏 cache 仅在新写成功后原子替换。"""
     manifest_path = Path(manifest_path)
     rows = _select_rows(
@@ -110,59 +222,63 @@ def extract_manifest(
         limit=limit,
     )
     signature = extractor.cache_signature(crop=crop, max_frames=max_frames)
-    summary = {"selected": len(rows), "processed": 0, "resumed": 0, "rebuilt": 0}
+    started = time.perf_counter()
+    summary: dict[str, Any] = {
+        "selected": len(rows),
+        "processed": 0,
+        "resumed": 0,
+        "rebuilt": 0,
+        "failed": 0,
+        "clips": [],
+    }
 
     with VideoSourceResolver(Path(temp_root)) as resolver:
         for row in rows:
-            source = _resolve_source(row["video_path"], manifest_path)
-            source_identity = resolver.probe(source)
-            cache_path = pose_cache_path(
-                Path(cache_root), dataset, split, row["clip_id"]
-            )
-            cache_existed = cache_path.exists()
-            if cache_existed:
-                try:
-                    cached = load_pose_cache(
-                        cache_path,
-                        expected_source_identity=source_identity,
-                        expected_extractor_signature=signature,
-                    )
-                    if not _cache_matches_row(cached, row):
-                        raise ValueError("pose cache manifest 身份不匹配")
-                    if cached.source_content_sha256 != resolver.content_sha256(source):
-                        raise ValueError("pose cache 源内容 SHA-256 不匹配")
-                except ValueError:
-                    pass
-                else:
-                    summary["resumed"] += 1
-                    continue
-
-            with resolver.materialize(source) as materialized:
-                sequence = extractor.extract(
-                    materialized.local_path,
+            clip_started = time.perf_counter()
+            try:
+                clip_result = _process_row(
+                    row,
+                    manifest_path=manifest_path,
+                    resolver=resolver,
+                    extractor=extractor,
+                    dataset=dataset,
+                    split=split,
+                    cache_root=Path(cache_root),
+                    signature=signature,
                     crop=crop,
                     max_frames=max_frames,
                 )
-                record = PoseCacheRecord(
-                    clip_id=row["clip_id"],
-                    dataset=dataset,
-                    split=split,
-                    source_identity=materialized.identity,
-                    source_content_sha256=materialized.content_sha256,
-                    extractor_signature=signature,
-                    fps=sequence.fps,
-                    frame_indices=sequence.frame_indices,
-                    timestamps=sequence.timestamps,
-                    keypoints=sequence.keypoints,
-                    bboxes=sequence.bboxes,
-                    track_ids=sequence.track_ids,
-                    valid_mask=sequence.valid_mask,
-                    frame_size=sequence.frame_size,
+            except (OSError, RuntimeError, ValueError) as exc:
+                summary["failed"] += 1
+                summary["clips"].append(
+                    {
+                        "dataset": dataset,
+                        "split": split,
+                        "clip_id": row["clip_id"],
+                        "status": "error",
+                        "error_type": type(exc).__name__,
+                        "error": str(exc),
+                        "total_seconds": time.perf_counter() - clip_started,
+                    }
                 )
-                write_pose_cache(cache_path, record)
-            summary["processed"] += 1
-            if cache_existed:
-                summary["rebuilt"] += 1
+                continue
+            summary["clips"].append(clip_result)
+            if clip_result["status"] == "resumed":
+                summary["resumed"] += 1
+            else:
+                summary["processed"] += 1
+                if clip_result["status"] == "rebuilt":
+                    summary["rebuilt"] += 1
+    elapsed_seconds = time.perf_counter() - started
+    summary["elapsed_seconds"] = elapsed_seconds
+    summary["processed_clips_per_second"] = (
+        summary["processed"] / elapsed_seconds if summary["processed"] else 0.0
+    )
+    summary["cache_bytes"] = sum(
+        clip.get("cache_bytes", 0) for clip in summary["clips"]
+    )
+    if summary["failed"]:
+        raise PoseExtractionBatchError(summary)
     return summary
 
 
@@ -192,18 +308,22 @@ def main() -> None:
         image_size=args.image_size,
         confidence=args.confidence,
     )
-    summary = extract_manifest(
-        args.manifest,
-        extractor=extractor,
-        dataset=args.dataset,
-        split=args.split,
-        cache_root=args.cache_root,
-        temp_root=args.temp_root,
-        crop=args.crop,
-        max_frames=args.max_frames,
-        clip_ids=set(args.clip_ids) if args.clip_ids else None,
-        limit=args.limit,
-    )
+    try:
+        summary = extract_manifest(
+            args.manifest,
+            extractor=extractor,
+            dataset=args.dataset,
+            split=args.split,
+            cache_root=args.cache_root,
+            temp_root=args.temp_root,
+            crop=args.crop,
+            max_frames=args.max_frames,
+            clip_ids=set(args.clip_ids) if args.clip_ids else None,
+            limit=args.limit,
+        )
+    except PoseExtractionBatchError as exc:
+        print(json.dumps(exc.summary, ensure_ascii=False))
+        raise SystemExit(1) from exc
     print(json.dumps(summary, ensure_ascii=False))
 
 

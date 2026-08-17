@@ -7,7 +7,7 @@ import numpy as np
 import pytest
 
 from pipeline.pose_extractor import PoseSequence
-from tools.extract_keypoints import extract_manifest
+from tools.extract_keypoints import PoseExtractionBatchError, extract_manifest
 
 
 class _FakeExtractor:
@@ -94,9 +94,34 @@ def test_extract_manifest_resumes_valid_cache_and_rebuilds_changed_source(
         max_frames=30,
     )
 
-    assert first == {"selected": 1, "processed": 1, "resumed": 0, "rebuilt": 0}
-    assert second == {"selected": 1, "processed": 0, "resumed": 1, "rebuilt": 0}
-    assert third == {"selected": 1, "processed": 1, "resumed": 0, "rebuilt": 1}
+    assert {key: first[key] for key in ("selected", "processed", "resumed", "rebuilt", "failed")} == {
+        "selected": 1,
+        "processed": 1,
+        "resumed": 0,
+        "rebuilt": 0,
+        "failed": 0,
+    }
+    assert {key: second[key] for key in ("processed", "resumed", "rebuilt", "failed")} == {
+        "processed": 0,
+        "resumed": 1,
+        "rebuilt": 0,
+        "failed": 0,
+    }
+    assert {key: third[key] for key in ("processed", "resumed", "rebuilt", "failed")} == {
+        "processed": 1,
+        "resumed": 0,
+        "rebuilt": 1,
+        "failed": 0,
+    }
+    processed_clip = first["clips"][0]
+    assert processed_clip["status"] == "processed"
+    assert processed_clip["frames"] == 2
+    assert processed_clip["max_people"] == 0
+    assert processed_clip["observations"] == 0
+    assert processed_clip["cache_bytes"] > 0
+    assert processed_clip["extract_seconds"] >= 0.0
+    assert first["elapsed_seconds"] >= 0.0
+    assert first["processed_clips_per_second"] > 0.0
     assert len(extractor.calls) == 2
     assert temp_root.exists() and not list(temp_root.iterdir())
 
@@ -141,5 +166,58 @@ def test_extract_manifest_rebuilds_truncated_cache(tmp_path: Path):
 
     summary = extract_manifest(manifest, **options)
 
-    assert summary == {"selected": 1, "processed": 1, "resumed": 0, "rebuilt": 1}
+    assert {key: summary[key] for key in ("selected", "processed", "resumed", "rebuilt", "failed")} == {
+        "selected": 1,
+        "processed": 1,
+        "resumed": 0,
+        "rebuilt": 1,
+        "failed": 0,
+    }
     assert len(extractor.calls) == 2
+
+
+def test_partial_failure_keeps_successful_cache_and_returns_nonzero_summary(
+    tmp_path: Path,
+):
+    good = tmp_path / "good.mp4"
+    bad = tmp_path / "bad.mp4"
+    good.write_bytes(b"good")
+    bad.write_bytes(b"bad")
+    manifest = tmp_path / "manifest.csv"
+    rows = [
+        {
+            "dataset": "urfd",
+            "split": "val",
+            "clip_id": source.stem,
+            "video_path": str(source),
+            "has_fall": "1",
+        }
+        for source in (good, bad)
+    ]
+    with manifest.open("w", encoding="utf-8", newline="") as handle:
+        writer = csv.DictWriter(handle, fieldnames=rows[0])
+        writer.writeheader()
+        writer.writerows(rows)
+
+    class FailingExtractor(_FakeExtractor):
+        def extract(self, source: Path, *, crop: str, max_frames: int | None):
+            if Path(source).name == "bad.mp4":
+                raise RuntimeError("synthetic failure")
+            return super().extract(source, crop=crop, max_frames=max_frames)
+
+    with pytest.raises(PoseExtractionBatchError) as raised:
+        extract_manifest(
+            manifest,
+            extractor=FailingExtractor(),
+            dataset="urfd",
+            split="val",
+            cache_root=tmp_path / "cache",
+            temp_root=tmp_path / "temp",
+        )
+
+    summary = raised.value.summary
+    assert summary["processed"] == 1
+    assert summary["failed"] == 1
+    assert [clip["status"] for clip in summary["clips"]] == ["processed", "error"]
+    assert len(list((tmp_path / "cache").rglob("*.npz"))) == 1
+    assert not list((tmp_path / "temp").iterdir())

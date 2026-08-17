@@ -13,6 +13,7 @@ import numpy as np
 from ultralytics import YOLO
 
 from pipeline.inference_engine import CropMode, crop_frame, sanitize_fps
+from pipeline.pose_cache import CACHE_SCHEMA
 from pipeline.pose_track import MultiPoseTracker, TrackedPose
 
 POSE_EXTRACTION_PROTOCOL = "pose_extraction_v1"
@@ -71,8 +72,14 @@ class PoseExtractor:
         self.device = device
         self.image_size = image_size
         self.confidence = confidence
-        self.model = model_factory(self.model_path)
+        self._model_factory = model_factory
+        self._model: Any | None = None
         self.capture_factory = capture_factory
+
+    def _get_model(self) -> Any:
+        if self._model is None:
+            self._model = self._model_factory(self.model_path)
+        return self._model
 
     def cache_signature(
         self, *, crop: CropMode, max_frames: int | None = None
@@ -82,6 +89,7 @@ class PoseExtractor:
             raise ValueError(f"模型权重不存在，无法生成 cache 签名: {model_path}")
         return {
             "protocol": POSE_EXTRACTION_PROTOCOL,
+            "cache_schema": CACHE_SCHEMA,
             "model_sha256": _sha256_file(model_path),
             "implementation_sha256": _implementation_sha256(),
             "device": self.device,
@@ -107,6 +115,7 @@ class PoseExtractor:
             capture.release()
             raise ValueError(f"无法打开视频: {source}")
         fps = sanitize_fps(capture.get(cv2.CAP_PROP_FPS))
+        model = self._get_model()
         tracker = MultiPoseTracker(max_misses=max(3, round(fps * 0.4)))
         observations: list[list[TrackedPose]] = []
         frame_size: tuple[int, int] | None = None
@@ -121,7 +130,7 @@ class PoseExtractor:
                     frame_size = current_size
                 elif current_size != frame_size:
                     raise ValueError("视频帧尺寸在同一 clip 内发生变化")
-                result = self.model.predict(
+                result = model.predict(
                     source=view,
                     imgsz=self.image_size,
                     conf=self.confidence,

@@ -113,6 +113,38 @@ def test_extractor_keeps_empty_frames_in_dense_variable_person_sequence(tmp_path
     assert sequence.frame_size.tolist() == [48, 64]
 
 
+def test_extractor_loads_model_lazily_once_and_resets_tracker_per_clip(
+    tmp_path: Path,
+):
+    models: list[_FakeModel] = []
+    captures: list[_FakeCapture] = []
+
+    def model_factory(_path: str):
+        model = _FakeModel()
+        models.append(model)
+        return model
+
+    def capture_factory(_path: str):
+        capture = _FakeCapture()
+        captures.append(capture)
+        return capture
+
+    extractor = PoseExtractor(
+        model_path=tmp_path / "fake.pt",
+        model_factory=model_factory,
+        capture_factory=capture_factory,
+    )
+    assert models == []
+
+    first = extractor.extract(tmp_path / "a.mp4")
+    second = extractor.extract(tmp_path / "b.mp4")
+
+    assert len(models) == 1
+    assert models[0].predict_calls == 4
+    assert first.track_ids[0].tolist() == second.track_ids[0].tolist() == [1, 2]
+    assert len(captures) == 2 and all(capture.released for capture in captures)
+
+
 def test_extractor_signature_binds_model_bytes_code_and_behavior_config(tmp_path: Path):
     model_path = tmp_path / "model.pt"
     model_path.write_bytes(b"model-v1")
@@ -126,6 +158,7 @@ def test_extractor_signature_binds_model_bytes_code_and_behavior_config(tmp_path
     signature = extractor.cache_signature(crop="auto", max_frames=30)
 
     assert signature["protocol"] == "pose_extraction_v1"
+    assert signature["cache_schema"] == 1
     assert signature["model_sha256"] == hashlib.sha256(b"model-v1").hexdigest()
     assert len(signature["implementation_sha256"]) == 64
     assert signature["image_size"] == 320
