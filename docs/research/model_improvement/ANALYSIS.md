@@ -386,3 +386,134 @@ class SEBlock(nn.Module):
 - 新 TCN：~5-6M（4 流 + 注意力）
 - 合计：~8-9M（远低于 20M）
 - FP32 体积：~34MB（远低于 80MB）
+
+---
+
+## 十、新增发现（深度调研补充）
+
+### E. 直接相关：YOLO11n-pose + 扩张卷积跌倒检测（SPIE 2025）
+- **论文**：Fall detection using YOLO11n-pose and dilated convolution-based temporal
+- **链接**：https://www.spiedigitallibrary.org/conference-proceedings-of-spie/14119/141190I/
+- **核心**：与我们的方案**高度一致**——同样用 YOLO11n-pose 做姿态估计，再用扩张卷积 TCN 做时序分类
+- **借鉴**：直接对标的 baseline，应仔细阅读其扩张卷积设计和参数配置
+
+### F. 多阶段跌倒检测框架（Nature SR 2025）
+- **论文**：Multistage fall detection framework via 3D pose sequences with temporal convolutional modeling
+- **链接**：https://www.nature.com/articles/s41598-025-11325-y
+- **核心**：3D 姿态序列 + 多阶段时序卷积建模
+- **借鉴**：多阶段设计（检测→分类→确认），可减少误报
+
+### G. Tiny-HAR：边缘设备轻量 HAR（IEEE 2024）
+- **论文**：Skeleton-Based Human Action Recognition Using Multitype Input Data on Edge Devices in IoT Systems
+- **链接**：https://ieeexplore.ieee.org/document/11373235
+- **核心**：专为 IoT 边缘设备设计的轻量 HAR 框架，使用骨架数据和多种时空信息
+- **借鉴**：极低参数量下的高效架构设计，直接适用于我们的参数约束
+
+### H. 知识蒸馏骨架动作识别（ScienceDirect 2023）
+- **论文**：A light-weight skeleton human action recognition model based on knowledge distillation
+- **链接**：https://www.sciencedirect.com/science/article/abs/pii/S1568494623011845
+- **核心**：知识蒸馏压缩骨架动作识别模型，用于边缘多媒体 IoT
+- **借鉴**：先训练大模型（教师），再蒸馏到小模型（学生），可将 10M+ 模型压缩到 1-2M 且保持精度
+
+### I. MAG-KD：掩码引导自适应蒸馏（2024）
+- **论文**：MAG-KD: Mask-Guided Adaptive Gating Knowledge Distillation for Skeleton-Based Recognition on Edge Devices
+- **链接**：https://www.researchgate.net/publication/403559863
+- **核心**：Student-M 仅 0.48M 参数，Top-1 准确率 94.25%
+- **借鉴**：掩码引导的自适应蒸馏策略，可用于将大 TCN 蒸馏到小 TCN
+
+### J. DG-STGCN：动态图时空卷积（arXiv 2022）
+- **论文**：DG-STGCN: Dynamic Spatial-Temporal Modeling for Skeleton-Based Action Recognition
+- **链接**：https://arxiv.org/abs/2210.05895
+- **核心**：DG-TCN 做分组时序卷积（不同感受野），动态关节-骨架融合模块
+- **借鉴**：分组时序卷积 + 动态融合，可直接应用到我们的多流架构
+
+### K. SkeletonMAE：自监督骨架预训练（ICPR 2022）
+- **论文**：SkeletonMAE: Spatial-Temporal Masked Autoencoders for Self-Supervised Skeleton Action Recognition
+- **链接**：https://arxiv.org/abs/2209.02399
+- **核心**：遮盖部分骨架帧/关节，让模型重建，学习通用骨架表示
+- **借鉴**：在 OF-Syn 9,600 clips 上做自监督预训练，再 fine-tune，可提升小数据集性能
+
+### L. 轻量 GCN 高效骨架识别（IEEE 2024）
+- **论文**：Lightweight Graph Convolutional Network for Efficient Skeleton Based Action Recognition
+- **链接**：https://ieeexplore.ieee.org/document/10651467
+- **核心**：轻量图卷积网络，在保持精度的同时大幅减少参数
+- **借鉴**：GCN 的轻量化设计策略
+
+### M. SGN：语义引导神经网络（0.69M 参数）
+- **论文**：Semantics-Guided Neural Networks for Efficient Skeleton-Based Action Recognition (CVPR 2020)
+- **核心**：仅 0.69M 参数在 NTU-60 X-Sub 达到 89.0%
+- **借鉴**：语义信息（关节语义标签、帧索引）引导特征学习，极低参数下的高效设计
+
+---
+
+## 十一、比赛约束下的可行性评估
+
+| 改进方向 | 参数增加 | 时延影响 | 精度预期 | 实现复杂度 | 比赛可行性 |
+|---|---|---|---|---|---|
+| A: 扩大 TCN + 多尺度 | +2-3M | +5-10ms | +5-8% | 低 | ✅ 直接可行 |
+| B: 多流特征 (Joint+Bone+Motion) | +3-4M | +10-15ms | +3-6% | 中 | ✅ 可行 |
+| C: SE 注意力 | +50-100K | +1-2ms | +2-3% | 低 | ✅ 直接可行 |
+| C: Transformer 注意力 | +200-500K | +5-8ms | +2-4% | 中 | ✅ 可行 |
+| D: 32 帧窗口 | 0 | +3-5ms | +2-3% | 低 | ✅ 直接可行 |
+| E: 知识蒸馏（大→小） | 0（推理时） | 0 | +3-5% | 高 | ⚠️ 需要训练教师模型 |
+| F: 自监督预训练 | 0（推理时） | 0 | +2-4% | 中 | ⚠️ 需要额外预训练阶段 |
+| G: 多阶段检测 | +500K | +3-5ms | +2-3% | 中 | ✅ 可行 |
+
+### 参数预算总览（最大方案）
+
+| 组件 | 当前 | 改进后 | 预算占比 |
+|---|---|---|---|
+| YOLO11n-pose | 2.87M | 2.87M（不变） | 14.4% |
+| 4 流 TCN + SE + Attention | 0.13M | ~5.5M | 27.5% |
+| 融合层 + 分类头 | — | ~0.5M | 2.5% |
+| **合计** | **3.0M** | **~8.9M** | **44.5%** |
+| FP32 体积 | 12MB | ~36MB | 45% |
+| **剩余预算** | | **~11M** | **55.5%** |
+
+### 时延预算（V100）
+
+| 组件 | 当前 | 改进后 |
+|---|---|---|
+| YOLO 检测 | ~12ms | ~12ms（不变） |
+| TCN 推理 | ~0.5ms | ~3-5ms |
+| 解码+跟踪+聚合 | ~5ms | ~5ms |
+| **端到端 P95** | **18.28ms** | **~22-25ms** |
+| **约束** | ≤100ms | ✅ 远低于上限 |
+
+---
+
+## 十二、已核实数字参考
+
+### Ultralytics YOLO 姿态模型对比
+
+| 模型 | mAP50-95 (pose) | TensorRT 时延 | 参数 (M) | FLOPs (B) |
+|---|---|---|---|---|
+| YOLOv8n-pose | 50.4 | 1.18ms (A100) | 3.3 | 9.2 |
+| YOLOv8s-pose | 60.0 | 1.42ms (A100) | 11.6 | 30.2 |
+| YOLO11n-pose | 50.0 | 1.7ms (T4, TRT10 FP16) | 2.9 | 7.4 |
+| YOLO11s-pose | 58.9 | 2.6ms (T4) | 9.9 | 23.1 |
+| YOLO11m-pose | 64.9 | 4.9ms (T4) | 20.9 | 71.4 |
+
+**结论**：当前 YOLO11n-pose（2.9M）是最优选择。YOLO11s-pose（9.9M）精度高 8.9pt，但参数增加 7M——如果预算允许，可考虑升级到 YOLO11s-pose，但会大幅压缩 TCN 的参数空间。
+
+### 骨架时序网络参考
+
+| 模型 | 参数 | NTU X-Sub | 说明 |
+|---|---|---|---|
+| ST-GCN 原版 | 3.1M | 81.5% | 首个时空图卷积 |
+| SGN | 0.69M | 89.0% | 语义引导，极轻量 |
+| TCN/GRU | <0.5M | — | 可压到极低参数 |
+| TCN-GRU 混合 | — | — | 跌倒检测常用 |
+| TCN+Transformer | — | 99%+ (UP-Fall) | TCNTE 方案 |
+
+**关键洞察**：二分类跌倒任务上 ST-GCN 相对 TCN/GRU 的精度增益通常 <2pt（待验证）→ 默认选 TCN，遮挡严重再上 SGN 级轻量 GCN。
+
+### 压缩技术实测锚点
+
+| 技术 | 效果 | 来源 |
+|---|---|---|
+| 结构化剪枝 | YOLOv11n → 2.378M 参数、mAP50 0.7882 | https://iieta.org/journals/isi/paper/10.18280/isi.310503 |
+| MGD 特征级蒸馏 | 检测任务 +2~3 AP | https://arxiv.org/abs/2205.01529 |
+| RepGhost 重参数化 | 推理零分支开销 | https://arxiv.org/html/2211.06088 |
+
+**申报口径提醒**：fp32 权重 ≤80MB ⇒ 20M×4B 恰为上限 ⇒ 申报按 fp32 存盘计；量化文件更小但若评测方自载 fp32 推理则量化无效。

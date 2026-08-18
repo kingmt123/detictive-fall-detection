@@ -49,3 +49,41 @@
 | 多方法 PyTorch 实现 | https://github.com/qbxlvnf11/skeleton-based-action-recognition-methods |
 | UP-Fall 3D 骨架数据 | https://github.com/Tresor-Koffi/3D_skeletons-UP-Fall-Dataset |
 | NTU RGB+D 数据集 | https://github.com/shahroudy/nturgb-d |
+
+## 新增论文（深度调研补充）
+
+### 跌倒检测直接相关
+
+| 论文 | 链接 | 关键点 |
+|---|---|---|
+| YOLO11n-pose + 扩张卷积 TCN (SPIE 2025) | https://www.spiedigitallibrary.org/conference-proceedings-of-spie/14119/141190I/ | 直接对标方案 |
+| 多阶段跌倒检测 3D 姿态 TCN (Nature SR 2025) | https://www.nature.com/articles/s41598-025-11325-y | 多阶段设计 |
+| 跌倒检测 OpenPose + LSTM/GRU (PMC 2021) | https://www.mdpi.com/2076-3417/11/1/329 | LSTM/GRU baseline |
+
+### 轻量边缘部署
+
+| 论文 | 链接 | 关键点 |
+|---|---|---|
+| Tiny-HAR 边缘 HAR (IEEE 2024) | https://ieeexplore.ieee.org/document/11373235 | IoT 边缘设备 |
+| 知识蒸馏骨架轻量模型 (ScienceDirect 2023) | https://www.sciencedirect.com/science/article/abs/pii/S1568494623011845 | KD 压缩 |
+| MAG-KD 边缘蒸馏 0.48M (2024) | https://www.researchgate.net/publication/403559863 | 0.48M/94.25% |
+| 轻量 GCN 高效骨架识别 (IEEE 2024) | https://ieeexplore.ieee.org/document/10651467 | GCN 轻量化 |
+
+### 图卷积与注意力
+
+| 论文 | 链接 | 关键点 |
+|---|---|---|
+| DG-STGCN 动态图时空卷积 (arXiv 2022) | https://arxiv.org/abs/2210.05895 | 分组时序+动态融合 |
+| SkeletonMAE 自监督预训练 (ICPR 2022) | https://arxiv.org/abs/2209.02399 | 自监督骨架预训练 |
+| SGN 语义引导 0.69M (CVPR 2020) | 引自 DenseGCN 综述 | 0.69M/89.0% |
+| DSTA-Net 解耦时空注意力 | https://arxiv.org/abs/2007.03263 | 空间+时序解耦注意力 |
+| DSTA-Net GitHub | https://github.com/lshiwjx/DSTA-Net | PyTorch 实现 |
+
+### 综述论文
+
+| 论文 | 链接 | 关键点 |
+|---|---|---|
+| 跌倒检测 SOTA 综述 (ScienceDirect 2025) | https://www.sciencedirect.com/science/article/pii/S2667099225000350 | 全面综述 |
+| AI 老人跌倒检测综述 (Springer 2026) | https://link.springer.com/article/10.1007/s12559-026-10550-5 | 最新综述 |
+| 跌倒检测系统综述 (PMC 2025) | https://pmc.ncbi.nlm.nih.gov/articles/PMC12609574 | 系统综述 |
+| 基于姿态的跌倒检测综述 (PMC 2025) | https://pmc.ncbi.nlm.nih.gov/articles/PMC12107650 | 姿态估计框架对比 |
