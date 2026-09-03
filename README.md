@@ -1,5 +1,44 @@
 # 视觉实时跌倒检测竞赛项目
 
+## 比赛最终版本（2026-09-03）
+
+**当前部署包 `deploy/final_model` 即本比赛项目的最终版本。**
+最终入口为无标签七头 EdgeFall 推理模型，接收原始 RGB 视频，使用 YOLO 姿态轨迹与
+七个成员头输出，按 raw logits 算术平均后取 sigmoid 得到风险分数。
+
+- [部署说明](deploy/final_model/README.md)
+- [完整文件与权重 SHA-256 清单](deploy/final_model/MANIFEST.json)
+- [最终项目文档 PDF](deliverables/抹茶吃不饱_面向低算力平台的实时跌倒检测_项目文档.pdf)
+- [项目汇报 PPT](deliverables/抹茶吃不饱_面向低算力平台的实时跌倒检测_项目汇报PPT_improved.pptx)
+- [参赛视频](deliverables/抹茶吃不饱_面向低算力平台的实时跌倒检测_项目视频.mp4)
+- [端到端烟测记录](reports/final_model_smoke.json)
+
+在仓库根目录执行以下 PowerShell 命令；完整源码、锁定依赖及两份权重均已纳入仓库：
+
+```powershell
+cd deploy/final_model
+python -m pip install -r requirements.txt
+python -m tools.infer_seven_head input.mp4 `
+  --artifact weights/edgefall_seven_head_label_blind_v1.pt `
+  --yolo-checkpoint weights/yolo11n-pose.pt `
+  --output result.json `
+  --device cuda:0
+```
+
+请将 `input.mp4` 替换为实际视频路径，并使用尚不存在的输出文件名。
+环境建议及详细输出格式见部署说明。
+
+包内已有记录：OF-Syn val 1,200 clips，mAP 75.208%、P@R90 77.907%、
+P@R95 72.509%；模型 4.053M 参数；本机 3,960 帧视频平均耗时 15.45 ms/帧。
+这些是开发验证记录，不是官方比赛成绩。比赛最终版本已冻结，V100 端到端 P95
+尚未复测；包内原始 `deployment_candidate_pending_v100_p95` 状态保留用于证据追溯。
+本次发布保持部署包原始字节及校验清单不变。
+
+## 历史基线与开发记录
+
+**以下内容为早期开发快照，其中“当前”“下一阶段”、测试数量与限制均对应当时的
+规则基线，不代表上方最终七头部署包的状态。最终使用以上方部署入口为准。**
+
 面向低算力视觉平台的纯视觉跌倒检测原型。目前已完成无需训练即可运行的
 **YOLO11n-pose + 多目标跟踪 + 时序物理规则 + 事件聚合**端到端基线，并保留
 FallTCN 接口用于后续监督训练。
@@ -49,6 +88,19 @@ python tools/prepare_omnifall_events.py
 不能声称身份独立。
 
 ## 运行端到端 Demo
+
+最终七头模型已隔离部署到 `deploy/final_model`。在该目录安装锁定依赖后运行：
+
+```bash
+python -m tools.infer_seven_head input.mp4 \
+  --artifact weights/edgefall_seven_head_label_blind_v1.pt \
+  --yolo-checkpoint weights/yolo11n-pose.pt \
+  --output result.json \
+  --device cuda:0
+```
+
+部署包保留 `MANIFEST.json`，用于核验全部源码和权重的 SHA-256。原有规则基线
+入口仍可按下方命令独立运行。
 
 ```bash
 python infer.py data/sources/urfd/fall-01-cam1.mp4 \

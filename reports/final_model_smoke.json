@@ -1,0 +1,33 @@
+{
+  "fps": 30.0,
+  "frames": 160,
+  "latency_ms": {
+    "heads_and_fusion": 27.161800011526793,
+    "per_frame": 49.79654250000749,
+    "pose": 6689.241799991578,
+    "roi": 753.196299992851,
+    "skeleton": 497.8469000052428,
+    "total": 7967.446800001198
+  },
+  "member_logits": [
+    0.1620248556137085,
+    -1.0573517084121704,
+    -2.4001314640045166,
+    -1.2596306800842285,
+    -1.8319576978683472,
+    -1.752681016921997,
+    -2.569751024246216
+  ],
+  "proposal": {
+    "end_time": 4.766666666666667,
+    "motion_score": 0.5326597109161589,
+    "observed_frames": 78,
+    "peak_time": 2.7666666666666666,
+    "start_time": 0.7666666666666666,
+    "track_id": 3
+  },
+  "protocol": "edgefall_seven_head_label_blind_runtime_v1",
+  "score": 0.17800459265708923,
+  "selection_is_label_blind": true,
+  "source": "D:\\HermesWorkspace\\Detictive\\data\\sources\\urfd\\fall-01-cam1.mp4"
+}

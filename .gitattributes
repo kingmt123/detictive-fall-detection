@@ -1,0 +1,2 @@
+# Preserve the frozen deployment bytes recorded in MANIFEST.json.
+deploy/final_model/** -text
