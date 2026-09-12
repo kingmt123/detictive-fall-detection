@@ -1,8 +1,8 @@
 {
   "files": {
     "README.md": {
-      "bytes": 3126,
-      "sha256": "8a91c00cec7571b7431715c051790587d5b0679cc2c8a7ee70a0c9202a6f22d7"
+      "bytes": 3311,
+      "sha256": "7b1095c896af068a6dd9708f59ea917b175d5eeb69c8fcb3c5b3232816e64325"
     },
     "eval/__init__.py": {
       "bytes": 0,
@@ -712,6 +712,6 @@
   "fusion": "mean(seven raw logits) then sigmoid",
   "schema": 1,
   "selection_is_label_blind": true,
-  "status": "deployment_candidate_pending_v100_p95",
+  "status": "v100_average_latency_validated_pending_frame_p95",
   "release": "competition_final_2026-09-12"
 }

@@ -46,8 +46,8 @@ python -m tools.infer_seven_head input.mp4 `
 
 - OF-Syn val（1,200 clips）：mAP 75.208%，P90 77.907%，P95 72.509%。
 - 参数：4.053M，FP32 参数量 15.46 MiB（按共享 YOLO、共享 skeleton 和七个头计）。
-- 本机完整 3,960 帧视频：15.45 ms/帧平均耗时。
+- NVIDIA V100 完整视频端到端实测：PyTorch 2.9.0 + CUDA 12.8；3,960 帧、30 FPS 视频总耗时 58.483 秒，平均 14.77 ms/帧，约 67.7 FPS；模型 score=0.749772，候选区间为 45.57–49.57 秒，峰值位于 47.57 秒。
 - 从未为本次部署读取 OF-Syn sealed test 或 URFD test。
 
-V100 的端到端 P95 仍需在比赛指定环境复测；在获得该证据前，本包状态为 deployment
-candidate，不能把开发验证 mAP 当作最终比赛成绩。
+V100 实测记录的是完整视频平均时延；逐帧 P95 分布尚未保存，不能将平均值表述为 P95。
+开发验证 mAP 不等同于封存测试或最终比赛成绩。
