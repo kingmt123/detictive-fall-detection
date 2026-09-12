@@ -124,6 +124,17 @@ def _validate_record(record: PoseCacheRecord) -> None:
         raise ValueError("padding observation 的 track_id 必须为 -1")
     if np.any(record.track_ids[record.valid_mask] < 0):
         raise ValueError("有效 observation 的 track_id 必须为非负整数")
+    valid_keypoints = record.keypoints[record.valid_mask]
+    if valid_keypoints.size and np.any(
+        (valid_keypoints[..., 2] < 0.0) | (valid_keypoints[..., 2] > 1.0)
+    ):
+        raise ValueError("有效 keypoint confidence 必须位于 [0,1]")
+    valid_bboxes = record.bboxes[record.valid_mask]
+    if valid_bboxes.size and np.any(
+        (valid_bboxes[:, 2] <= valid_bboxes[:, 0])
+        | (valid_bboxes[:, 3] <= valid_bboxes[:, 1])
+    ):
+        raise ValueError("有效 bbox 必须满足 x2>x1 且 y2>y1")
     for frame_track_ids, frame_valid_mask in zip(
         record.track_ids, record.valid_mask, strict=True
     ):
@@ -143,13 +154,12 @@ def _validate_record(record: PoseCacheRecord) -> None:
         raise ValueError("frame_size 必须是正整数 int64 [height,width]")
 
 
-def load_pose_cache(
-    path: Path,
-    *,
-    expected_source_identity: dict[str, Any],
-    expected_extractor_signature: dict[str, Any],
-) -> PoseCacheRecord:
-    """加载与当前源、提取实现一致的 cache；不允许 pickle。"""
+def read_pose_cache(path: Path) -> PoseCacheRecord:
+    """读取并完整校验 cache，但不要求调用方重新构造提取签名。
+
+    训练数据消费层使用这个入口读取已经冻结的只读 cache；提取阶段的 resume
+    仍应使用 :func:`load_pose_cache`，额外核对源身份和提取签名。
+    """
     try:
         with np.load(path, allow_pickle=False) as payload:
             schema = int(payload["cache_schema"])
@@ -159,10 +169,6 @@ def load_pose_cache(
             )
             if schema != CACHE_SCHEMA:
                 raise ValueError(f"不支持的 pose cache schema: {schema}")
-            if source_identity_json != _canonical_json(expected_source_identity):
-                raise ValueError("pose cache 源身份不匹配")
-            if extractor_signature_json != _canonical_json(expected_extractor_signature):
-                raise ValueError("pose cache 提取签名不匹配")
             record = PoseCacheRecord(
                 clip_id=str(payload["clip_id"].item()),
                 dataset=str(payload["dataset"].item()),
@@ -183,6 +189,25 @@ def load_pose_cache(
             return record
     except (OSError, KeyError, TypeError, json.JSONDecodeError, zipfile.BadZipFile) as exc:
         raise ValueError(f"pose cache 损坏或字段不完整: {path}") from exc
+
+
+def load_pose_cache(
+    path: Path,
+    *,
+    expected_source_identity: dict[str, Any],
+    expected_extractor_signature: dict[str, Any],
+) -> PoseCacheRecord:
+    """加载与当前源、提取实现一致的 cache；不允许 pickle。"""
+    record = read_pose_cache(path)
+    if _canonical_json(record.source_identity) != _canonical_json(
+        expected_source_identity
+    ):
+        raise ValueError("pose cache 源身份不匹配")
+    if _canonical_json(record.extractor_signature) != _canonical_json(
+        expected_extractor_signature
+    ):
+        raise ValueError("pose cache 提取签名不匹配")
+    return record
 
 
 def write_pose_cache(path: Path, record: PoseCacheRecord) -> None:

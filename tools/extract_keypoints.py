@@ -17,6 +17,7 @@ from pipeline.pose_cache import (
 )
 from pipeline.pose_extractor import PoseExtractor
 from pipeline.video_source import VideoSourceResolver
+from tools.clip_ids import load_clip_ids
 
 
 class PoseExtractionBatchError(RuntimeError):
@@ -48,6 +49,8 @@ def _select_rows(
     split: str,
     clip_ids: set[str] | None,
     limit: int | None,
+    shard_index: int | None = None,
+    shard_count: int | None = None,
 ) -> list[dict[str, str]]:
     if split == "test":
         raise ValueError("pose cache 阶段禁止读取 test split")
@@ -55,6 +58,13 @@ def _select_rows(
         raise ValueError("dataset 和 split 必须显式指定")
     if limit is not None and limit <= 0:
         raise ValueError("limit 必须大于 0")
+    if (shard_index is None) != (shard_count is None):
+        raise ValueError("shard_index 和 shard_count 必须同时指定")
+    if shard_count is not None:
+        if shard_count <= 0:
+            raise ValueError("shard_count 必须大于 0")
+        if shard_index is None or not 0 <= shard_index < shard_count:
+            raise ValueError("shard_index 必须位于 [0, shard_count)")
 
     with manifest_path.open(encoding="utf-8", newline="") as handle:
         reader = csv.DictReader(handle)
@@ -83,6 +93,12 @@ def _select_rows(
         if missing_clip_ids:
             raise ValueError(f"指定 clip_id 不在所选 split: {missing_clip_ids}")
         selected = [row for row in selected if row["clip_id"] in clip_ids]
+    if shard_count is not None:
+        selected = [
+            row
+            for position, row in enumerate(selected)
+            if position % shard_count == shard_index
+        ]
     if limit is not None:
         selected = selected[:limit]
     return selected
@@ -211,6 +227,8 @@ def extract_manifest(
     max_frames: int | None = None,
     clip_ids: set[str] | None = None,
     limit: int | None = None,
+    shard_index: int | None = None,
+    shard_count: int | None = None,
 ) -> dict[str, Any]:
     """验证已有 cache 后 resume；陈旧/损坏 cache 仅在新写成功后原子替换。"""
     manifest_path = Path(manifest_path)
@@ -220,6 +238,8 @@ def extract_manifest(
         split=split,
         clip_ids=clip_ids,
         limit=limit,
+        shard_index=shard_index,
+        shard_count=shard_count,
     )
     signature = extractor.cache_signature(crop=crop, max_frames=max_frames)
     started = time.perf_counter()
@@ -296,12 +316,16 @@ def _parser() -> argparse.ArgumentParser:
     parser.add_argument("--crop", choices=("none", "auto", "left", "right"), default="auto")
     parser.add_argument("--max-frames", type=int)
     parser.add_argument("--limit", type=int)
+    parser.add_argument("--shard-index", type=int)
+    parser.add_argument("--shard-count", type=int)
     parser.add_argument("--clip-id", action="append", dest="clip_ids")
+    parser.add_argument("--clip-id-file", type=Path)
     return parser
 
 
 def main() -> None:
     args = _parser().parse_args()
+    clip_ids = load_clip_ids(args.clip_ids, [args.clip_id_file] if args.clip_id_file else None)
     extractor = PoseExtractor(
         model_path=args.model,
         device=args.device,
@@ -320,8 +344,10 @@ def main() -> None:
                 temp_root=args.temp_root,
                 crop=args.crop,
                 max_frames=args.max_frames,
-                clip_ids=set(args.clip_ids) if args.clip_ids else None,
+                clip_ids=clip_ids,
                 limit=args.limit,
+                shard_index=args.shard_index,
+                shard_count=args.shard_count,
             )
         except PoseExtractionBatchError as exc:
             print(json.dumps(exc.summary, ensure_ascii=False))

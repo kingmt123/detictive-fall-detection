@@ -6,3 +6,4 @@ opencv-python==5.0.0.93
 numpy==2.4.3
 PyYAML==6.0.3
 pytest==9.1.1
+transformers==4.57.6

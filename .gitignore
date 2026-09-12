@@ -1,30 +1,7 @@
-data/
-runs/
-reports/*.mp4
-reports/*.jpg
-reports/*_debug.json
-reports/*_predictions.jsonl
-reports/*_summary.json
-*.pt
-*.onnx
 __pycache__/
+*.py[cod]
 .venv/
-data/omnifall/data_files/
-data/sources/
-
-# Secrets
+.pytest_cache/
 .env
 .env.*
-*.env
-
-# Local development workspaces and generated caches
-/.worktrees/
-/parallel_worker_20260824/
-/tmp/
-/.cache/
-/.pytest_cache/
-/.ruff_cache/
-
-# Frozen competition deployment weights
-!/deploy/final_model/weights/edgefall_seven_head_label_blind_v1.pt
-!/deploy/final_model/weights/yolo11n-pose.pt
+result.json

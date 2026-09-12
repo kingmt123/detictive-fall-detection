@@ -402,6 +402,12 @@ def main() -> None:
     parser.add_argument("--imgsz", type=int, default=640)
     parser.add_argument("--conf", type=float, default=0.10)
     parser.add_argument(
+        "--temporal-mode", choices=["rule", "tcn", "fusion"], default="rule"
+    )
+    parser.add_argument("--tcn-checkpoint", type=Path)
+    parser.add_argument("--tcn-run-json", type=Path)
+    parser.add_argument("--tcn-weight", type=float, default=0.5)
+    parser.add_argument(
         "--temp-root",
         type=Path,
         default=Path("runs/tmp/evaluate_manifest"),
@@ -420,6 +426,10 @@ def main() -> None:
         device=args.device,
         image_size=args.imgsz,
         confidence=args.conf,
+        temporal_mode=args.temporal_mode,
+        tcn_checkpoint=args.tcn_checkpoint,
+        tcn_run_json=args.tcn_run_json,
+        tcn_weight=args.tcn_weight,
     )
     summary = evaluate_manifest(
         args.manifest,

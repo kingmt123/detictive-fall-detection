@@ -17,16 +17,20 @@ from typing import Any, Literal
 
 import cv2
 import numpy as np
+import torch
 from ultralytics import YOLO
 
+from models.tcn_inference import OnlineFallTCNScorer
 from pipeline.event_aggregator import FrameScore, aggregate_tracks
 from pipeline.fusion import TemporalFallScorer
 from pipeline.pose_track import MultiPoseTracker
 from pipeline.rules import PoseFeatures, compute_pose_features
 
 CropMode = Literal["auto", "none", "left", "right"]
+TemporalMode = Literal["rule", "tcn", "fusion"]
 ALERT_THRESHOLD = 0.50
 INFERENCE_PROTOCOL = "pose_motion_rule_baseline_v2"
+TCN_INFERENCE_PROTOCOL = "pose_motion_tcn_fusion_v1"
 SKELETON = [
     (5, 6),
     (5, 11),
@@ -162,17 +166,47 @@ class InferenceEngine:
         image_size: int = 640,
         confidence: float = 0.10,
         model_factory: Callable[[str], Any] = YOLO,
+        temporal_mode: TemporalMode = "rule",
+        tcn_checkpoint: Path | None = None,
+        tcn_run_json: Path | None = None,
+        tcn_weight: float = 0.5,
     ) -> None:
+        if temporal_mode not in {"rule", "tcn", "fusion"}:
+            raise ValueError(f"未知 temporal_mode: {temporal_mode}")
+        if not 0.0 <= tcn_weight <= 1.0:
+            raise ValueError("tcn_weight 必须位于 [0,1]")
+        if temporal_mode != "rule" and (
+            tcn_checkpoint is None or tcn_run_json is None
+        ):
+            raise ValueError("TCN/fusion 模式必须提供 checkpoint 和 run.json")
         self.model_path = model_path
         self.device = device
         self.image_size = image_size
         self.confidence = confidence
         self.model = model_factory(model_path)
+        self.temporal_mode = temporal_mode
+        self.tcn_weight = tcn_weight
+        self.tcn_checkpoint = Path(tcn_checkpoint) if tcn_checkpoint else None
+        self.tcn_run_json = Path(tcn_run_json) if tcn_run_json else None
+        self.tcn_scorer: OnlineFallTCNScorer | None = None
+        if temporal_mode != "rule":
+            torch_device = torch.device(
+                f"cuda:{device}" if device.isdigit() else device
+            )
+            self.tcn_scorer = OnlineFallTCNScorer.from_artifacts(
+                self.tcn_checkpoint,
+                self.tcn_run_json,
+                device=torch_device,
+            )
 
     def cache_signature(self) -> dict[str, object]:
         """返回绑定算法实现与全部行为参数的稳定缓存签名。"""
         return {
-            "protocol": INFERENCE_PROTOCOL,
+            "protocol": (
+                INFERENCE_PROTOCOL
+                if self.temporal_mode == "rule"
+                else TCN_INFERENCE_PROTOCOL
+            ),
             "implementation_sha256": _inference_source_sha256(),
             "dependency_versions": {
                 package: _package_version(package)
@@ -185,8 +219,28 @@ class InferenceEngine:
                 "max_center_distance": 1.5,
             },
             "temporal_scorer": {
+                "mode": self.temporal_mode,
                 "window_seconds": 1.2,
                 "reset_gap_seconds": 0.5,
+                "tcn_weight": self.tcn_weight,
+                "tcn_checkpoint_sha256": (
+                    hashlib.sha256(self.tcn_checkpoint.read_bytes()).hexdigest()
+                    if self.tcn_checkpoint is not None
+                    else None
+                ),
+                "tcn_run_json_sha256": (
+                    hashlib.sha256(self.tcn_run_json.read_bytes()).hexdigest()
+                    if self.tcn_run_json is not None
+                    else None
+                ),
+                "tcn_runtime_sha256": (
+                    hashlib.sha256(
+                        (Path(__file__).parent.parent / "models" / "tcn_inference.py")
+                        .read_bytes()
+                    ).hexdigest()
+                    if self.tcn_scorer is not None
+                    else None
+                ),
             },
             "event_aggregator": {
                 "smooth_win": 3,
@@ -206,6 +260,7 @@ class InferenceEngine:
         output_events: Path | None = None,
         crop: CropMode = "auto",
         max_frames: int | None = None,
+        frame_transform: Callable[[np.ndarray, int], np.ndarray] | None = None,
     ) -> dict:
         """分析一个视频；无渲染模式不创建 ``VideoWriter``。"""
         source = Path(source)
@@ -241,6 +296,8 @@ class InferenceEngine:
                 raise ValueError(f"无法创建输出视频: {output_video}")
 
         tracker = MultiPoseTracker(max_misses=max(3, round(fps * 0.4)))
+        if self.tcn_scorer is not None:
+            self.tcn_scorer.reset()
         scorers: dict[int, TemporalFallScorer] = {}
         frame_scores_by_track: dict[int, list[FrameScore]] = defaultdict(list)
         previous_center_y: dict[int, float] = {}
@@ -250,11 +307,15 @@ class InferenceEngine:
             "predict": [],
             "cpu_transfer": [],
             "track_rule": [],
+            "tcn_fusion": [],
             "render_encode": [],
             "frame_end_to_end": [],
             "aggregate": [],
         }
         frame_index = 0
+        frames_with_pose = 0
+        pose_observations = 0
+        component_clip_scores = {"rule": 0.0, "tcn": 0.0, "fusion": 0.0}
 
         try:
             while max_frames is None or frame_index < max_frames:
@@ -265,6 +326,17 @@ class InferenceEngine:
                     break
                 timestamp = frame_index / fps
                 view, _ = crop_frame(frame, crop)
+                if frame_transform is not None:
+                    transformed = frame_transform(view, frame_index)
+                    if (
+                        not isinstance(transformed, np.ndarray)
+                        or transformed.shape != view.shape
+                        or transformed.dtype != np.uint8
+                    ):
+                        raise ValueError(
+                            "frame_transform 必须返回同形状的 uint8 ndarray"
+                        )
+                    view = transformed
                 stage_ms["decode_crop"].append(
                     (time.perf_counter() - stage_start) * 1000.0
                 )
@@ -297,6 +369,8 @@ class InferenceEngine:
 
                 stage_start = time.perf_counter()
                 frame_score: float | None = None
+                rule_scores: dict[int, float | None] = {}
+                observations: dict[int, tuple[np.ndarray, np.ndarray]] = {}
                 tracked_poses = []
                 if has_detections:
                     tracked_poses = tracker.update(boxes, confidences, keypoints)
@@ -330,27 +404,11 @@ class InferenceEngine:
                                 else None
                             ),
                         )
-                        score = scorer.update(timestamp, features)
-                        frame_scores_by_track[track_id].append(
-                            FrameScore(timestamp, score)
-                        )
-                        if score is not None:
+                        rule_scores[track_id] = scorer.update(timestamp, features)
+                        observations[track_id] = (tracked.keypoints, tracked.box)
+                        if rule_scores[track_id] is not None:
                             previous_center_y[track_id] = features.center_y
                             previous_detection_t[track_id] = timestamp
-                            frame_score = (
-                                score
-                                if frame_score is None
-                                else max(frame_score, score)
-                            )
-                        if render:
-                            _draw_pose(
-                                view,
-                                tracked.box,
-                                tracked.keypoints,
-                                score,
-                                tracked.confidence,
-                                track_id,
-                            )
                 else:
                     tracked_poses = tracker.update(
                         np.empty((0, 4), dtype=np.float32),
@@ -358,9 +416,71 @@ class InferenceEngine:
                         np.empty((0, 17, 3), dtype=np.float32),
                     )
                 observed_ids = {tracked.track_id for tracked in tracked_poses}
+                frames_with_pose += int(bool(observed_ids))
+                pose_observations += len(observed_ids)
+                stage_ms["track_rule"].append(
+                    (time.perf_counter() - stage_start) * 1000.0
+                )
+
+                stage_start = time.perf_counter()
+                tcn_scores: dict[int, float | None] = {}
+                if self.tcn_scorer is not None:
+                    tcn_scores = self.tcn_scorer.score_frame(
+                        frame_index,
+                        observations,
+                        active_track_ids=tracker.active_track_ids,
+                    )
+                tracked_by_id = {tracked.track_id: tracked for tracked in tracked_poses}
+                for track_id in observed_ids:
+                    rule_value = rule_scores.get(track_id)
+                    tcn_value = tcn_scores.get(track_id)
+                    if rule_value is None:
+                        fusion_value = tcn_value
+                    elif tcn_value is None:
+                        fusion_value = rule_value
+                    else:
+                        fusion_value = (
+                            (1.0 - self.tcn_weight) * rule_value
+                            + self.tcn_weight * tcn_value
+                        )
+                    if rule_value is not None:
+                        component_clip_scores["rule"] = max(
+                            component_clip_scores["rule"], rule_value
+                        )
+                    if tcn_value is not None:
+                        component_clip_scores["tcn"] = max(
+                            component_clip_scores["tcn"], tcn_value
+                        )
+                    if fusion_value is not None:
+                        component_clip_scores["fusion"] = max(
+                            component_clip_scores["fusion"], fusion_value
+                        )
+                    if self.temporal_mode == "rule":
+                        score = rule_value
+                    elif self.temporal_mode == "tcn" or rule_value is None:
+                        score = tcn_value
+                    else:
+                        score = fusion_value
+                    frame_scores_by_track[track_id].append(
+                        FrameScore(timestamp, score)
+                    )
+                    if score is not None:
+                        frame_score = (
+                            score if frame_score is None else max(frame_score, score)
+                        )
+                    if render:
+                        tracked = tracked_by_id[track_id]
+                        _draw_pose(
+                            view,
+                            tracked.box,
+                            tracked.keypoints,
+                            score,
+                            tracked.confidence,
+                            track_id,
+                        )
                 for track_id in tracker.active_track_ids - observed_ids:
                     frame_scores_by_track[track_id].append(FrameScore(timestamp, None))
-                stage_ms["track_rule"].append(
+                stage_ms["tcn_fusion"].append(
                     (time.perf_counter() - stage_start) * 1000.0
                 )
 
@@ -399,11 +519,23 @@ class InferenceEngine:
         payload = {
             "source": str(source.resolve()),
             "model": self.model_path,
-            "protocol": INFERENCE_PROTOCOL,
+            "protocol": (
+                INFERENCE_PROTOCOL
+                if self.temporal_mode == "rule"
+                else TCN_INFERENCE_PROTOCOL
+            ),
+            "temporal_mode": self.temporal_mode,
+            "tcn_weight": self.tcn_weight if self.temporal_mode == "fusion" else None,
             "crop": crop,
             "fps": fps,
             "source_frames": source_frames,
             "processed_frames": frame_index,
+            "pose_coverage": {
+                "frames_with_pose": frames_with_pose,
+                "frame_fraction": frames_with_pose / frame_index if frame_index else 0.0,
+                "observations": pose_observations,
+            },
+            "component_clip_scores": component_clip_scores,
             "clip_score": max(
                 (
                     item.score
@@ -420,7 +552,7 @@ class InferenceEngine:
             "assumptions": [
                 "event matching protocol is provisional until organizer confirmation",
                 "stage timings are local wall-clock measurements, not V100 submission results",
-                "rule baseline is untrained; trained TCN will replace the primary temporal score",
+                "TCN/fusion scores are causal and use only current/past pose frames",
             ],
         }
         if output_events is not None:
