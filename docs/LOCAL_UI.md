@@ -1,31 +1,64 @@
-# EdgeFall 本地视频测试界面
+# EdgeFall 本地工业验证工作台
 
-这是在原七头模型外增加的 **本地测试功能**。不会修改 `tools.infer_seven_head`、模型结构、权重或既有评分方式，也不部署 Hugging Face Spaces。
+本项目是冻结的 **EdgeFall 视觉七头基线** 外部的单机 Web 操作界面；没有修改原始模型、权重、CLI 推理入口及其评测协议。本版本不是生产级实时监控产品，也不部署至 Hugging Face Spaces。
 
-## 安装和启动
+## 快速安装与运行
 
-在仓库根目录使用 Python 3.11 与适配本机驱动的 PyTorch 环境，安装原项目依赖及界面依赖：
+推荐 Windows + WSL2 + Python 3.11 + 可用的 NVIDIA GPU：
 
 ```bash
+git clone -b feature/local-fall-testing-ui https://github.com/kingmt123/detictive-fall-detection.git
+cd detictive-fall-detection
+python -m venv .venv
+source .venv/bin/activate
 pip install -r requirements.txt
 pip install -r requirements-ui.txt
 python app.py
 ```
 
-打开 http://127.0.0.1:7860，上传视频并点击「开始检测」。默认优先选择可用 CUDA，否则使用 CPU（CPU 性能尚未验证）。在 Windows + WSL2 下，请在 WSL2 里启动并通过 Windows 浏览器访问该地址。无需 Hugging Face Spaces。
+在 Windows 浏览器打开 http://127.0.0.1:7860。默认仅监听 `127.0.0.1`，不开启 Gradio 公共分享。原项目锁定的 CUDA/PyTorch 依赖不一定兼容每个系统；若首次安装失败，优先检查 NVIDIA 驱动、WSL2 GPU 映射、Python/PyTorch/CUDA 对应关系。
 
-仓库内 `requirements.txt` 锁定的 CUDA 版本不一定适配所有系统。首次安装若发生包版本冲突，应先检查 Python、CUDA 与 PyTorch 的兼容性，不要为解决 UI 安装而擅自更改原权重。
+```bash
+# 可选：未检测到 GPU 时测试 CPU（性能可能较差）
+EDGEFALL_DEVICE=cpu python app.py
+# 可选：指定端口
+EDGEFALL_PORT=7861 python app.py
+```
 
-## 输出
+## 界面结构
 
-视频级七头评分（不是校准后的真实概率）和各成员 raw logits；从姿态运动提出的候选区间、运动峰值及 track ID；分阶段耗时；可下载 JSON 与标注运动区间的 MP4。不会伪造人体检测框或逐帧跌倒标签。
+1. **视频检测工作台**：上传视频、执行原七头模型推理、查看时间戳叠加的结果回放，可定位到运动峰值。
+2. **事件与证据**：候选时间轴（开始/峰值/结束），从原视频直接提取「开始前 / 峰值 / 结束后」三帧证据；不虚构人体检测框或逐帧跌倒标签。
+3. **模型诊断**：视频级融合评分、七头原始 logits 分布、各阶段耗时及 JSON 导出。
+4. **历史与人工复核**：最近 100 条检测记录、人工确认/排除/无法判断、备注记录及复核 JSON 导出。
 
-结果保存到 `outputs/local_ui/run-*/`。上传视频限制 250 MB 和 180 秒。若缺少 ffmpeg，会退回到 MP4V 编码，部分浏览器可能无法预览。
+## 数据语义和安全边界
+
+- `score` = `sigmoid(mean(member_logits))`：**视频级、未经校准的评分**，不是跌倒概率或工业安全报警阈值。
+- `proposal` 仅是姿态运动算法提出的候选事件：不是已证实的跌倒事件，也不是逐帧分类器输出。
+- 人工复核保存在独立的 `review.json`；**永不修改**冻结模型的 `result.json`。
+- `latency_ms.per_frame` 是整段总耗时均值，不等于在线报警延迟或逐帧 P95。
+- 当前没有实时摄像头流接入、分人连续在线判定、告警闭环、设备联锁、远程身份认证、并发多租户、自动删除/加密、事件级精度证明，不应直接用于无人值守工业安全控制或医疗紧急报警。
+- Gradio 界面默认开放给访问本机端口的人；本地操作员身份目前未验证，`review.json` 中明确记录 `local-unverified`。敏感影像应按使用机构的数据留存规则管理。
+
+## 本地文件
+
+全部保存在 `outputs/local_ui/run-*/`，并被 `.gitignore` 忽略：
+
+- `result.json`：模型推理原样数据。
+- `preview.mp4`：画面叠加视频级评分和姿态运动候选窗口。
+- `evidence.jpg`：三帧真实视频截图。
+- `case.json`：本地时间、文件名、推理设备和协议。
+- `review.json`：人工复核事件及备注，仅复核后出现。
+
+上传的视频不是永久保存的源片；历史记录打开后展示的是结果回放和事件截图，而不是伪装成原始输入的视频。
+
+限制：上传视频 ≤250MB、长度 ≤180 秒；暂不支持在网页上对大批量或实时多路摄像头进行监控。
 
 ## 验证
 
 ```bash
-python -m pytest tests/test_local_ui.py -q
+python -m pytest tests/test_local_ui.py tests/test_local_ui_dashboard.py -q
 ```
 
-此验证使用合成视频与模拟模型，并非原权重 GPU 推理或模型准确率复测。
+这些测试使用合成视频和模拟推理模型，检验 UI、证据文件、历史/复核语义与路径保护。**无法替代**真实模型 GPU 运行、设备长时间稳定性、误报率、漏报率和报警延迟验证。
