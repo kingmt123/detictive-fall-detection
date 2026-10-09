@@ -74,7 +74,7 @@ def build_app(runner: FallModelRunner | None = None):
         except Exception as exc:
             raise gr.Error(f"读取记录失败：{exc}") from exc
         # Historical upload source is not persisted: avoid showing a stale video.
-        return _display(case, video=case.get("video"))
+        return (*_display(case, video=case.get("video")), None)
 
     def on_review(case_id: str | None, verdict: str, note: str):
         if not case_id:
@@ -98,10 +98,7 @@ def build_app(runner: FallModelRunner | None = None):
         seconds = float((case["result"].get("proposal") or {}).get("peak_time", 0))
         return gr.update(value=case["video"], playback_position=max(0, seconds))
 
-    with gr.Blocks(
-        title="EdgeFall | 工业检测工作台",
-        css=THEME_CSS,
-    ) as demo:
+    with gr.Blocks(title="EdgeFall | 工业检测工作台") as demo:
         gr.HTML(hero_html())
         current_case = gr.State("")
 
@@ -174,7 +171,7 @@ def build_app(runner: FallModelRunner | None = None):
         run_button.click(on_detect, inputs=original,
                          outputs=display_outputs + [historic, selector],
                          concurrency_limit=1)
-        load.click(on_load, inputs=selector, outputs=display_outputs,
+        load.click(on_load, inputs=selector, outputs=display_outputs + [original],
                    concurrency_limit=1)
         refresh.click(_refresh_choices, outputs=[historic, selector])
         save.click(on_review, inputs=[current_case, verdict, note],
@@ -191,6 +188,6 @@ if __name__ == "__main__":
     host = "127.0.0.1"
     port = int(os.environ.get("EDGEFALL_PORT", "7860"))
     build_app().queue(default_concurrency_limit=1).launch(
-        server_name=host, server_port=port, share=False, show_error=True,
+        css=THEME_CSS, server_name=host, server_port=port, share=False, show_error=True,
         allowed_paths=[str(DEFAULT_OUTPUT_ROOT.resolve())],
     )
