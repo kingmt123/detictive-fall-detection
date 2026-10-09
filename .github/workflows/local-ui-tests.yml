@@ -1,0 +1,41 @@
+name: Local UI checks
+
+on:
+  pull_request:
+    paths:
+      - "app.py"
+      - "local_ui/**"
+      - "tests/test_local_ui*.py"
+      - "requirements-ui.txt"
+      - ".github/workflows/local-ui-tests.yml"
+  push:
+    branches:
+      - "feature/local-fall-testing-ui"
+    paths:
+      - "app.py"
+      - "local_ui/**"
+      - "tests/test_local_ui*.py"
+      - "requirements-ui.txt"
+      - ".github/workflows/local-ui-tests.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  ui-smoke-and-evidence:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+          cache-dependency-path: requirements-ui.txt
+      - name: Install minimal UI test environment
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install "gradio==6.5.1" "numpy>=2,<3" \
+            "opencv-python-headless>=4.10,<5" "pytest>=8,<10"
+      - name: Run isolated UI tests (no real model weights)
+        run: python -m pytest -q tests/test_local_ui.py tests/test_local_ui_dashboard.py

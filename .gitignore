@@ -5,3 +5,5 @@ __pycache__/
 .env
 .env.*
 result.json
+# Local UI may contain source video metadata and human review notes.
+outputs/local_ui/

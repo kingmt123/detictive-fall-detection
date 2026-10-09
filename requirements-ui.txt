@@ -1,0 +1,2 @@
+# Install baseline requirements.txt separately (its CUDA/PyTorch pins are unchanged).
+gradio>=6.0,<7.0
